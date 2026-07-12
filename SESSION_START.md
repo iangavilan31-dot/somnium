@@ -1,6 +1,8 @@
 # SOMNIUM — session boot file
 
 **Read `BRIEF.md` first. The GOAL at its top wins every conflict.**
+**Then `WORLD_BIBLE.md` §0–§2 — the world's source of truth. Every new creative element
+passes its Consistency Gate and lands one line in `docs/CANON_LOG.md`. No exceptions.**
 
 - **What:** 2.5D painted co-op journey — two knights wake in a dark-fantasy-paperback
   world (Frazetta/McBride/Nasmith + film grain, one accent hue per scene).
