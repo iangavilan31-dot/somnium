@@ -139,17 +139,23 @@ function bakeSky(): Layer {
       "#c8b7a3", (big ? 0.5 : 0.15 + R() * 0.3) * (0.25 + 0.75 * fade));
   }
 
-  // the sky is FULL of weather — banked cloud masses, red-bellied, gaps for stars
-  cloudMass(ctx, R, 430, 235, 560, 110, "#160607", 0.11, 0.30);
-  cloudMass(ctx, R, 1080, 130, 660, 100, "#130507", 0.10, 0.18);
-  cloudMass(ctx, R, 1830, 250, 600, 120, "#170708", 0.11, 0.34);
+  // the sky is FULL of weather — banked cloud masses, red-bellied, gaps for stars.
+  // The bank is SCULPTED, not murk: every mass near the sun column carries a hot
+  // under-lit base rim — form comes from the lit edge, never from body brightness.
+  cloudMass(ctx, R, 430, 235, 560, 110, "#160607", 0.11, 0.40);
+  cloudMass(ctx, R, 1080, 130, 660, 100, "#130507", 0.10, 0.48);
+  cloudMass(ctx, R, 1830, 250, 600, 120, "#170708", 0.11, 0.52);
   cloudMass(ctx, R, 2300, 140, 420, 90, "#130507", 0.09, 0.15);
   cloudMass(ctx, R, 150, 120, 380, 85, "#130507", 0.09, 0.12);
 
   // low warm veil in the west — enough light for the thorn sentinel to stand against
-  cloudMass(ctx, R, 330, 530, 500, 130, "#1d0908", 0.10, 0.5);
+  cloudMass(ctx, R, 330, 530, 500, 130, "#1d0908", 0.12, 0.7);
   for (let i = 0; i < 24; i++) {
-    dab(ctx, 120 + R() * 520, 430 + R() * 260, 90 + R() * 140, 14 + R() * 18, 0, "#2a0c08", 0.09);
+    dab(ctx, 120 + R() * 520, 430 + R() * 260, 90 + R() * 140, 14 + R() * 18, 0, "#2a0c08", 0.12);
+  }
+  // a warmer pocket directly behind the sentinel's crown — its dark limbs need lit air
+  for (let i = 0; i < 10; i++) {
+    dab(ctx, 280 + R() * 300, 470 + R() * 180, 70 + R() * 110, 12 + R() * 16, 0, "#341009", 0.10);
   }
 
   // faintest, farthest ridge — barely there
@@ -159,14 +165,17 @@ function bakeSky(): Layer {
   ctx.restore();
 
   // thin haze veils crossing the disc's latitudes — celestial, not clipart
-  for (let i = 0; i < 7; i++) {
+  // (few: the face must not read as evenly striped)
+  for (let i = 0; i < 4; i++) {
     const vy = 440 + R() * 240;
     dab(ctx, SUN_X + (R() - 0.5) * 300, vy, 160 + R() * 180, 4 + R() * 8, (R() - 0.5) * 0.06,
-      "#3f0f0c", 0.12);
+      "#3f0f0c", 0.10);
   }
 
-  // massive masses the disc rises through — under-lit crimson where they face it
-  cloudMass(ctx, R, 1150, 400, 640, 130, "#1a0606", 0.13, 0.85);
+  // massive masses the disc rises through — under-lit crimson where they face it.
+  // Bodies stay SMOKE-THIN over the bright face (a dense roll reads as a bruise);
+  // the hot rim is what carries the form.
+  cloudMass(ctx, R, 1150, 400, 640, 130, "#1a0606", 0.10, 0.85);
   cloudMass(ctx, R, 700, 480, 460, 110, "#180606", 0.12, 0.6);
   cloudMass(ctx, R, 1640, 445, 500, 115, "#190606", 0.12, 0.75);
 
@@ -214,7 +223,9 @@ function bakeSky(): Layer {
 
   // the disc sits IN the weather: billows clip its limbs…
   // (warm-black bodies — anything blue-leaning reads as a gray bruise on the disc)
-  cloudMass(ctx, R, 940, 352, 300, 70, "#1a0505", 0.12, 0.9);
+  // One BOLD mass on the upper-left limb + one low-right: an odd, asymmetric rhythm —
+  // a painter's composition, never evenly-spaced strips.
+  cloudMass(ctx, R, 950, 355, 360, 88, "#1a0505", 0.11, 1.0);
   cloudMass(ctx, R, 1400, 705, 340, 80, "#180404", 0.13, 1.0);
 
   // …and slivers cross its face — soft ragged cloud strips, not scratches:
@@ -238,10 +249,10 @@ function bakeSky(): Layer {
         10 + tt * 16, 1.4, 0.03, "#d84a24", 0.07 * tt);
     }
   };
-  wisp(905, 468, 540, 7, 10, 0.55);
-  wisp(1000, 585, 420, 10, -8, 0.66);
-  wisp(860, 668, 580, 6, 6, 0.46);
-  wisp(1240, 512, 300, 5, 5, 0.40);
+  // two face wisps only — one strong mid, one faint low; weight varies, spacing
+  // varies. Four even bands read as stripes cut through the disc (iteration-4 kill).
+  wisp(980, 585, 470, 10, -8, 0.66);
+  wisp(870, 672, 560, 6, 6, 0.42);
 
   // soft scattering — faint shafts fanning off the rim, and a horizon bloom
   for (const [ang, len] of [[-2.35, 780], [-1.95, 880], [-1.5, 920], [-1.05, 840], [-0.65, 760]] as [number, number][]) {
@@ -554,7 +565,7 @@ function bakeMidHill(): Layer {
   }
   for (let i = 0; i < 22; i++) { // warm haze pool behind the silhouette so it reads
     dab(ctx, tX + (R() - 0.5) * 220, tB - 60 - R() * 55, 60 + R() * 80, 10 + R() * 14, 0,
-      "#4d1810", 0.10);
+      "#4d1810", 0.13);
   }
   ctx.save();
   ctx.translate(tX, tB - 24);
@@ -592,11 +603,12 @@ function bakeMidHill(): Layer {
   ctx.lineTo(-9.6, -78);
   ctx.stroke();
   ctx.globalAlpha = 1;
-  // two faint warm lights — someone, or something, keeps them lit
-  dab(ctx, -3, -56, 1.5, 2, 0, "#e0904e", 0.75);
-  dab(ctx, -3, -56, 4, 5, 0, "#7a3a1c", 0.22);
-  dab(ctx, 4, -34, 1.2, 1.6, 0, "#c97c40", 0.55);
-  dab(ctx, 4, -34, 3, 4, 0, "#6b3218", 0.16);
+  // two faint warm lights — someone, or something, keeps them lit.
+  // They hold steady while the Ember breathes: a keeper's light keeps its own time.
+  dab(ctx, -3, -56, 1.5, 2, 0, "#e0904e", 0.85);
+  dab(ctx, -3, -56, 4, 5, 0, "#7a3a1c", 0.28);
+  dab(ctx, 4, -34, 1.2, 1.6, 0, "#c97c40", 0.65);
+  dab(ctx, 4, -34, 3, 4, 0, "#6b3218", 0.20);
   ctx.restore();
 
   return { canvas: c, parallax: 0.45, yOff: 750 };
@@ -805,12 +817,22 @@ function bakeGround(): Layer {
     const cxx = 1100 + R() * 420, cy = 950 + R() * 120;
     flower(cxx + (R() - 0.5) * 60, cy + (R() - 0.5) * 30, 0.8 + ((cy - 950) / 120) * 1.4);
   }
-  for (let i = 0; i < 200; i++) {
+  // ambient scatter, thinned — the drifts below carry the composition, not noise
+  for (let i = 0; i < 120; i++) {
     flower(R() * WORLD_W, 950 + R() * 280, 0.75 + R() * 1.0);
   }
-  // a second, looser drift west of the wake patch
-  for (let i = 0; i < 45; i++) {
-    flower(560 + R() * 340, 965 + R() * 200, 0.7 + R() * 1.1);
+  // COMPOSED DRIFT — a sweeping arc from the wake patch toward the thorn sentinel:
+  // the eye reads knight → flowers → tree, not a random sprinkle (iteration 4)
+  for (let i = 0; i < 80; i++) {
+    const u = R();
+    const px = (1 - u) * (1 - u) * 1150 + 2 * (1 - u) * u * 760 + u * u * 470;
+    const py = (1 - u) * (1 - u) * 985 + 2 * (1 - u) * u * 1080 + u * u * 1235;
+    flower(px + (R() - 0.5) * (70 + u * 90), py + (R() - 0.5) * 34, 0.7 + u * 1.1 + R() * 0.3);
+  }
+  // …and a thin trickle east, climbing beside the path to the wayshrine
+  for (let i = 0; i < 22; i++) {
+    const u = R();
+    flower(1400 + u * 150 + (R() - 0.5) * 40, 1005 - u * 75 + (R() - 0.5) * 22, 0.65 + R() * 0.5);
   }
 
   // leaning wayshrine stone beside the path — someone prayed here once
@@ -939,13 +961,16 @@ function bakeThornTree(): Layer {
   // trunk in two gnarled stages — a TREE, not a sapling: it dominates the west edge.
   // The big limbs anchor high so their silhouettes live against the lit sky,
   // never black-on-black against the ridge bands.
-  limb(470, 1082, 424, 900, 458, 740, 54, 30, 0.75);
-  const t2 = limb(458, 744, 488, 620, 442, 470, 30, 14, 0.7);
-  const a1 = limb(462, 690, 620, 590, 786, 548, 18, 4, 0.75); // the great east limb
-  const a2 = limb(452, 560, 566, 462, 706, 428, 12, 3, 0.65);
+  limb(470, 1082, 424, 900, 458, 740, 54, 30, 0.85);
+  const t2 = limb(458, 744, 488, 620, 442, 470, 30, 14, 0.8);
+  const a1 = limb(462, 690, 620, 590, 786, 548, 18, 4, 0.8);  // the great east limb
+  const a2 = limb(452, 560, 566, 462, 706, 428, 12, 3, 0.7);
   const a3 = limb(448, 540, 374, 430, 318, 392, 12, 3, 0);    // up-west, off frame
   limb(466, 896, 396, 850, 344, 828, 10, 3, 0);               // low dead stub west
   const a5 = limb(442, 476, 462, 396, 440, 348, 10, 2.4, 0.6); // crown spike
+  // iteration 4: two more mid limbs — the sentinel carries real mass, not whiskers
+  const a6 = limb(456, 632, 556, 556, 662, 508, 11, 2.6, 0.7); // second east reach
+  const a7 = limb(464, 800, 388, 742, 322, 700, 10, 2.6, 0);   // low west counterweight
 
   // secondary twigs off the big limbs
   const tw = (x: number, y: number, ang: number, len: number, w0 = 4) => {
@@ -969,6 +994,8 @@ function bakeThornTree(): Layer {
   thorns(a3, 2, 7);
   thorns(a5, 2, 7);
   thorns(t2, 3, 9);
+  thorns(a6, 2, 8);
+  thorns(a7, 3, 7);
 
   // grass and stones at the base tie it into the field
   for (let i = 0; i < 26; i++) {
@@ -1144,6 +1171,21 @@ export function bakeVignette(w: number, h: number): HTMLCanvasElement {
   g.addColorStop(1, "rgba(0,0,0,0.55)");
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, w, h);
+  return c;
+}
+
+// the Ember's breath veil (World Bible §1: the disc breathes, ~8s, barely there).
+// Drawn per-frame OVER the plates at a breath-keyed alpha — the plates never re-bake.
+export function bakeEmberVeil(): HTMLCanvasElement {
+  const c = document.createElement("canvas");
+  c.width = c.height = 512;
+  const ctx = c.getContext("2d")!;
+  const g = ctx.createRadialGradient(256, 256, 26, 256, 256, 254);
+  g.addColorStop(0, "rgba(255,88,44,0.52)");
+  g.addColorStop(0.3, "rgba(205,52,28,0.28)");
+  g.addColorStop(1, "rgba(150,28,19,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, 512, 512);
   return c;
 }
 

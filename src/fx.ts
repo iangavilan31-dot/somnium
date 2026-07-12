@@ -3,6 +3,9 @@
 
 import { mulberry32, TAU } from "./math";
 import { bakeGlowSprite, WORLD_W } from "./paint";
+// ash-petals fall in the Ember's column (Chapter 1 weather law: dead-still air,
+// ash off the Ember, never rain) — the disc's apparent world-x sweeps 850..1450
+// across the camera range, so the spawn band covers it
 
 interface Particle {
   x: number; y: number; vx: number; vy: number;
@@ -31,6 +34,8 @@ export class Fx {
   private streakTimer = 18;
   private emberTimer = 0.8;
   private embers: Particle[] = [];
+  private ashTimer = 0.6;
+  private ashes: Petal[] = [];
 
   constructor() {
     for (let i = 0; i < 26; i++) {
@@ -149,6 +154,26 @@ export class Fx {
       if (s.age >= s.life) { this.streaks.splice(i, 1); continue; }
       s.x += s.vx * dt; s.y += s.vy * dt;
     }
+    // ash-petals falling off the Ember — dark flecks, silhouetted only where they
+    // cross the disc and its glow. Slow (Law 5: all ambient motion is drift).
+    this.ashTimer -= dt;
+    if (this.ashTimer <= 0 && this.ashes.length < 12) {
+      this.ashTimer = 0.9 + this.R() * 1.3;
+      this.ashes.push({
+        x: 800 + this.R() * 700, y: 320 + this.R() * 300,
+        vx: (this.R() - 0.5) * 5, vy: 11 + this.R() * 7,
+        age: 0, life: 15 + this.R() * 6,
+        size: 1.3 + this.R() * 1.0, color: "#1a0806",
+        sway: this.R() * TAU,
+      });
+    }
+    for (let i = this.ashes.length - 1; i >= 0; i--) {
+      const a = this.ashes[i];
+      a.age += dt;
+      if (a.age >= a.life) { this.ashes.splice(i, 1); continue; }
+      a.x += (a.vx + Math.sin(a.age * 0.9 + a.sway) * 4) * dt;
+      a.y += a.vy * dt;
+    }
     // embers rising off the sun-warmed band
     this.emberTimer -= dt;
     if (this.emberTimer <= 0 && this.embers.length < 10) {
@@ -206,6 +231,15 @@ export class Fx {
       ctx.fillStyle = m.color;
       ctx.beginPath();
       ctx.ellipse(m.x, m.y, m.size, m.size * 0.75, 0, 0, TAU);
+      ctx.fill();
+    }
+    // ash-petals — dark tumbling flakes; visible only against the Ember's light
+    for (const a of this.ashes) {
+      const u = a.age / a.life;
+      ctx.globalAlpha = 0.6 * (u < 0.08 ? u * 12.5 : 1 - Math.max(0, (u - 0.8) * 5));
+      ctx.fillStyle = a.color;
+      ctx.beginPath();
+      ctx.ellipse(a.x, a.y, a.size, a.size * 0.55, Math.sin(a.age * 1.1 + a.sway) * 1.2, 0, TAU);
       ctx.fill();
     }
     // petals

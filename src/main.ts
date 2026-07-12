@@ -2,7 +2,7 @@
 // Pipeline: plates → world (knight+fx) → foreground → grain → vignette → lifted blacks.
 
 import { clamp, damp, easeInOutCubic, lerp, noise1 } from "./math";
-import { bakeGrainTiles, bakeScene, bakeVignette, GROUND_Y, PLATE_RES, WORLD_W } from "./paint";
+import { bakeEmberVeil, bakeGrainTiles, bakeScene, bakeVignette, GROUND_Y, PLATE_RES, SUN_R, SUN_X, SUN_Y, WORLD_W } from "./paint";
 import { Knight } from "./knight";
 import { Fx } from "./fx";
 import { Input } from "./input";
@@ -26,6 +26,7 @@ resize();
 
 const scene = bakeScene();
 const grain = bakeGrainTiles();
+const emberVeil = bakeEmberVeil();
 const fx = new Fx();
 const knight = new Knight(1250);
 const input = new Input();
@@ -156,6 +157,26 @@ function render() {
 
   for (const l of scene.layers) drawLayer(l);
 
+  // THE EMBER BREATHES (World Bible §1) — an ~8.5s swell over everything the
+  // Ember lights. Keeper-lights (tower windows, fireflies) keep their own time:
+  // two kinds of light in this world — the Dreamer's, and somebody's work (Law 6).
+  const breath = Math.pow(0.5 + 0.5 * Math.sin(t * ((Math.PI * 2) / 8.5)), 1.35);
+  {
+    const pSky = 0.04; // the sky plate's parallax — anchors the veil on the disc
+    const skyCam = cam.x * pSky + (1 - pSky) * (WORLD_W / 2);
+    const sx = cx + (SUN_X - skyCam) * s;
+    const sy = gsY + (SUN_Y - GROUND_Y) * s;
+    ctx.save();
+    ctx.globalCompositeOperation = "lighter";
+    const rOut = SUN_R * 4.6 * s;
+    ctx.globalAlpha = 0.058 * breath;
+    ctx.drawImage(emberVeil, sx - rOut, sy - rOut, rOut * 2, rOut * 2);
+    const rIn = SUN_R * 2.1 * s;
+    ctx.globalAlpha = 0.078 * breath;
+    ctx.drawImage(emberVeil, sx - rIn, sy - rIn, rIn * 2, rIn * 2);
+    ctx.restore();
+  }
+
   // world pass (knight + fx share world coords)
   ctx.save();
   ctx.translate(cx + (0 - cam.x) * s, gsY + (0 - GROUND_Y) * s);
@@ -166,8 +187,9 @@ function render() {
 
   // thorn sentinel — just in front of the play plane, frames the west edge
   drawLayer(scene.thorn);
-  // foreground tufts — two baked variants crossfaded = wind
-  const wA = 0.5 + 0.5 * Math.sin(t * 0.85 + noise1(t * 0.3) * 1.3);
+  // foreground tufts — two baked variants crossfaded; the air is dead-still
+  // (Chapter 1 law), so the lean rides the Ember's breath, not a wind
+  const wA = 0.5 + 0.42 * Math.sin(t * 0.85 + noise1(t * 0.3) * 1.3) + 0.16 * (breath - 0.5);
   drawLayer(scene.fgA, wA);
   drawLayer(scene.fgB, 1 - wA);
   // nearest framing silhouettes (giant flowers, overhanging branch)
@@ -188,7 +210,7 @@ function render() {
   // (plain source-over: 'soft-light' is not GPU-accelerated in Chromium and
   // collapsed rAF to ~26fps under the screen recorder)
   ctx.save();
-  ctx.globalAlpha = 0.055;
+  ctx.globalAlpha = 0.050 + 0.010 * breath; // the whole frame inhales warmth with the Ember
   ctx.fillStyle = "#8a4a30";
   ctx.fillRect(0, 0, cw, ch);
   ctx.restore();

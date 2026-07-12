@@ -94,3 +94,23 @@ Budget headroom is enormous; 60fps bar cleared ~2.7× at the display's refresh c
    trunk 54px w/ deep gnarl bulges, limbs re-anchored high against the lit sky,
    warm west veil added behind it, hot 2.4px rims, east-facing thorns burn whole.
    Perf after everything: 165fps, sim 0.15ms, render 0.82ms during action.
+14. (iteration 4 — the Creative Review Board directive, 2026-07-12) **THE EMBER
+   BREATHES** — World Bible §1's dormant hook implemented: an ~8.5s breath swell
+   (draw-time "lighter" veil anchored to the disc + whole-frame glaze swell; the
+   foreground lean now rides the breath, not a wind — Ch1 air is dead-still).
+   Keeper-lights and fireflies deliberately do NOT pulse (Law 6: the Dreamer's
+   light vs somebody's work). First bake measured 16.7% swing at the disc —
+   too visible for "barely perceptible" — trimmed ~25%. **Ash-petals off the
+   Ember** built (§4 Ch1 weather): dark flecks falling in the disc's column,
+   visible only against its light. **Sky sculpted:** bank masses carry hot
+   under-lit rims (form from the lit edge, never body alpha); the disc face
+   de-striped (4 even wisps → 1 strong + 1 faint, odd rhythm); the face-crossing
+   mass thinned back to smoke after one bake rolled it into a "bruise" (body
+   0.13→0.10 — the many-and-weak law re-proven). **Thorn sentinel:** +2 mid
+   limbs, hotter rims, a warm pocket behind the crown — reads whole. **Flowers
+   recomposed:** ambient scatter thinned 200→120; a composed drift arcs
+   wake-patch → sentinel so the eye reads knight → flowers → tree; a trickle
+   climbs to the wayshrine. Tower haze pool + kept lights lifted. Perf: 165fps,
+   render 0.37ms. Proof: `docs/gate0/review/{hero,breath-min,breath-max}.png`;
+   `scripts/review-stills.mjs` measures the breath objectively (disc-region
+   mean-R over a full cycle) at native 1080p in a visible window.
