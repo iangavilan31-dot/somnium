@@ -2,7 +2,7 @@
 // Principles enforced here: anticipation, follow-through, weight, silhouette.
 
 import { clamp, damp, easeInCubic, easeInOutCubic, easeOutCubic, lerp, noise1, rad, TAU, type Ease } from "./math";
-import { GROUND_Y } from "./paint";
+import { GROUND_Y, SUN_X } from "./paint";
 import type { Fx } from "./fx";
 
 // ---- proportions (world px) ----
@@ -358,12 +358,20 @@ export class Knight {
     ctx.translate(this.x, GROUND_Y);
     ctx.scale(this.facing, 1);
 
+    // long shadow thrown away from the sun (cinematic key light)
+    const lowY = Math.max(p.ftF[1], p.ftN[1], p.pel[1] + 8);
+    const feetX = (p.ftF[0] + p.ftN[0]) / 2;
+    const shadowDir = (this.x >= SUN_X ? 1 : -1) * this.facing; // world dir → local
+    ctx.globalAlpha = 0.16;
+    ctx.fillStyle = "#020302";
+    ctx.beginPath();
+    ctx.ellipse(feetX + shadowDir * 42, Math.min(-2, lowY + 6), 58, 5.5, 0, 0, TAU);
+    ctx.fill();
     // contact shadow
     ctx.globalAlpha = 0.35;
     ctx.fillStyle = "#030403";
     ctx.beginPath();
-    const lowY = Math.max(p.ftF[1], p.ftN[1], p.pel[1] + 8);
-    ctx.ellipse((p.ftF[0] + p.ftN[0]) / 2, Math.min(-2, lowY + 6), 34, 7, 0, 0, TAU);
+    ctx.ellipse(feetX, Math.min(-2, lowY + 6), 34, 7, 0, 0, TAU);
     ctx.fill();
     ctx.globalAlpha = 1;
 

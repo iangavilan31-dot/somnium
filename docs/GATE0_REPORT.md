@@ -1,5 +1,16 @@
-# GATE 0 REPORT — knight animation spike
+# GATE 0 REPORT — knight animation spike + atmosphere benchmark
 **Date:** 2026-07-12 · **Status: AWAITING IAN'S GRADE — nothing gets built past this until he passes it.**
+
+> **Pass 4 — Ian's art-direction directive executed** (`docs/ART_DIRECTION.md`): no
+> content added; the Red-Sun Field got the full atmosphere pass — 9 depth layers
+> (sky/stars → 2 drifting cloud layers → ridge w/ broken watchtower → valley w/ mist +
+> sun-bleed → drifting far fog → rolling midhill w/ ruined arch + tree line → drifting
+> near fog → rolling ground), environmental storytelling (arch ruin, wayshrine stone,
+> watchtower foreshadowing the finale), vegetation variety (stones/branches/ferns/
+> seed-stalks/worn path), living atmosphere (fireflies w/ baked glow, flower petals on
+> the wind, raven flights, rare shooting stars, cloud/fog drift), stronger red key
+> light (grass kiss band, valley pool, long knight shadow), camera pulled back so the
+> world dominates. Perf after all of it: 165fps, render 0.44–0.61ms.
 
 ## What to look at
 - **Video (46s, the whole thing):** `docs/gate0/gate0.mp4` — title → wake-up in the

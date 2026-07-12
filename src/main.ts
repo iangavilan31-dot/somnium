@@ -30,7 +30,7 @@ const fx = new Fx();
 const knight = new Knight(1250);
 const input = new Input();
 
-const ZOOM_WIDE = 0.88, ZOOM_MID = 1.38;
+const ZOOM_WIDE = 0.88, ZOOM_MID = 1.30; // world dominates; knight stays small
 const cam = { x: 1200, zoom: ZOOM_WIDE };
 let t = 0;
 const skipTitle = location.search.includes("skip");
@@ -135,18 +135,22 @@ function render() {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "medium";
 
-  const drawLayer = (layer: { canvas: HTMLCanvasElement; parallax: number }, alpha = 1) => {
+  const drawLayer = (layer: { canvas: HTMLCanvasElement; parallax: number; drift?: number }, alpha = 1) => {
     const p = layer.parallax;
     const redCam = cam.x * p + (1 - p) * (WORLD_W / 2);
-    const dx = cx + (0 - redCam) * s;
     const dy = gsY + (0 - GROUND_Y) * s;
+    const w = (layer.canvas.width / PLATE_RES) * s;
+    const h = (layer.canvas.height / PLATE_RES) * s;
     ctx.globalAlpha = alpha;
-    ctx.drawImage(
-      layer.canvas,
-      dx, dy,
-      (layer.canvas.width / PLATE_RES) * s,
-      (layer.canvas.height / PLATE_RES) * s,
-    );
+    if (layer.drift) {
+      // wrap-drift (clouds, fog): draw twice for a seamless pass-through
+      const shift = (((t * layer.drift) % WORLD_W) + WORLD_W) % WORLD_W;
+      const dx = cx + (shift - redCam) * s;
+      ctx.drawImage(layer.canvas, dx, dy, w, h);
+      ctx.drawImage(layer.canvas, dx - w, dy, w, h);
+    } else {
+      ctx.drawImage(layer.canvas, cx + (0 - redCam) * s, dy, w, h);
+    }
     ctx.globalAlpha = 1;
   };
 
