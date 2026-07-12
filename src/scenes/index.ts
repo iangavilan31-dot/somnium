@@ -6,7 +6,11 @@ import { registerScene } from "../journey";
 import { SCENE2 } from "./scene2";
 import { SCENE3 } from "./scene3";
 import { SCENE4 } from "./scene4";
+import { SCENE5 } from "./scene5";
+import { EPILOGUE } from "./epilogue";
 
 registerScene(SCENE2);
 registerScene(SCENE3);
 registerScene(SCENE4);
+registerScene(SCENE5);
+registerScene(EPILOGUE);

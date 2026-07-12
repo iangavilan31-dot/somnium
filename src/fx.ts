@@ -66,6 +66,7 @@ export class Fx {
     this.birds.length = 0;
     this.moths.length = 0;
     this.bats.length = 0;
+    this.snow.length = 0;
     if (id === 3) {
       // the Moth Warden's street lamp (scene3.ts S3_LAMP) — her moths never leave it
       for (let i = 0; i < 6; i++) {
@@ -82,9 +83,21 @@ export class Fx {
         });
       }
     }
+    if (id === 5) {
+      // snowfall — the dream running cold and thin; slow always (Law 5)
+      for (let i = 0; i < 64; i++) {
+        this.snow.push({
+          x: this.R() * WORLD_W, y: this.R() * 1100,
+          vx: -(3 + this.R() * 6), vy: 22 + this.R() * 18,
+          age: this.R() * 10, life: 1e9,
+          size: 0.8 + this.R() * 1.6, color: "#c8d6e4",
+        });
+      }
+    }
   }
   private moths: Firefly[] = [];
   private bats: Bird[] = [];
+  private snow: Particle[] = [];
 
   dust(x: number, y: number, n: number, dir: number) {
     for (let i = 0; i < n; i++) {
@@ -139,6 +152,14 @@ export class Fx {
       if (p.age >= p.life) { this.petals.splice(i, 1); continue; }
       p.x += (p.vx + Math.sin(p.age * 1.6 + p.sway) * 10) * dt;
       p.y += (p.vy + Math.sin(p.age * 2.3 + p.sway) * 4) * dt;
+    }
+    // snowfall — sways, settles, returns to the sky
+    for (const s of this.snow) {
+      s.age += dt;
+      s.x += (s.vx + Math.sin(s.age * 0.8 + s.size * 7) * 9) * dt;
+      s.y += s.vy * dt;
+      if (s.y > 1240) { s.y = 240 + this.R() * 120; s.x = this.R() * WORLD_W; }
+      if (s.x < -20) s.x = WORLD_W + 10;
     }
     // stair-bats — riding the updraft in slow rising weaves; reset below when they
     // clear the band (the chasm exhales them forever)
@@ -302,6 +323,15 @@ export class Fx {
       ctx.ellipse(p.x, p.y, p.size, p.size * 0.6, Math.sin(p.age * 2 + p.sway) * 0.8, 0, TAU);
       ctx.fill();
     }
+    // snowfall — soft flecks, brighter the larger (nearer)
+    for (const s of this.snow) {
+      ctx.globalAlpha = 0.35 + s.size * 0.22;
+      ctx.fillStyle = s.color;
+      ctx.beginPath();
+      ctx.ellipse(s.x, s.y, s.size, s.size * 0.85, 0, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
     // stair-bats — jittery double-stroke wings, dark against the magenta band
     ctx.strokeStyle = "#0a0508";
     ctx.lineWidth = 1.6;

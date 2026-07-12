@@ -17,6 +17,7 @@ export interface SceneDef {
   id: number;
   name: string;
   whisper: string;            // 2–5 serif words on entry
+  whisperColor?: string;      // override when the default pale wash can't read
   boundsL: number; boundsR: number;
   spawnX: number;             // where the knights enter walking (or wake, scene 1)
   lightX: number;             // key-light world x — shadows point away from it

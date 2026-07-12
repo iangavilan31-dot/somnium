@@ -191,19 +191,29 @@ function sim(dt: number) {
   fire?.update(dt);
 
   // ---- transitions ----
-  if (trans === "none" && playable && sceneIdx + 1 < SCENES.length) {
-    // edge-exit scenes (S1: dusk takes the field; epilogue: waking)
+  if (trans === "none" && playable) {
+    // edge-exit scenes (S1: dusk takes the field; epilogue: waking OUT)
     if (scene.exitEastX != null && p1.x >= scene.exitEastX && (!k2 || k2.x >= scene.exitEastX - 140)) {
       beginTransition();
     }
     // fire-rest scenes: every present knight settled at the fire
-    if (fire && p1.sitSettled && (!k2 || k2.sitSettled)) beginTransition();
+    if (sceneIdx + 1 < SCENES.length && fire && p1.sitSettled && (!k2 || k2.sitSettled)) {
+      beginTransition();
+    }
   }
   if (trans !== "none") {
     transT += dt;
     if (trans === "out" && transT >= TRANS_S) {
-      const next = Math.min(sceneIdx + 1, SCENES.length - 1);
-      if (next !== sceneIdx) enterScene(next, true);
+      if (sceneIdx + 1 < SCENES.length) {
+        enterScene(sceneIdx + 1, true);
+      } else {
+        // "And waking up." — the journey ends where dreams do. Cut to title.
+        knights[1] = null;
+        enterScene(0, false);
+        p1.resetToLying(SCENES[0].spawnX);
+        seqT = 0; titleSkipped = false; wakeStarted = false; whisperT = -1;
+        cam.x = SCENES[0].spawnX - 50; cam.zoom = ZOOM_WIDE;
+      }
       trans = "in"; transT = 0;
     } else if (trans === "in" && transT >= TRANS_S) {
       trans = "none"; transT = 0;
@@ -377,7 +387,7 @@ function drawText(vs: number) {
     const aW = fadeAlpha(whisperT, 0.8, 2.0, 4.6, 6.2);
     if (aW > 0) {
       ctx.globalAlpha = aW * 0.68;
-      ctx.fillStyle = "#d5cabc";
+      ctx.fillStyle = scene.whisperColor ?? "#d5cabc";
       ctx.font = serif(26, vs);
       try { (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "3px"; } catch { /* older engines */ }
       ctx.fillText(scene.whisper, w / 2, h * 0.34);

@@ -76,6 +76,35 @@ await ev("window.__somnium.walk(0)");
 await sleep(700);
 await still("r4-mid");
 
+// ---- SCENE 5 ----
+await ev("window.__somnium.skipToScene(5)");
+await sleep(2400);
+await waitIdle();
+await sleep(900);
+await still("r5-spawn");
+await ev("window.__somnium.walk(1)");
+t0 = Date.now();
+while (Date.now() - t0 < 16000 && (await ev("window.__somnium.x()")) < 1150) await sleep(180);
+await ev("window.__somnium.walk(0)");
+await sleep(700);
+await still("r5-arena");
+
+// ---- EPILOGUE ----
+await ev("window.__somnium.skipToScene(6)");
+await sleep(2400);
+await waitIdle();
+await sleep(900);
+await still("r6-epilogue");
+// walk beneath the tree — and waking up (journey-complete → title)
+await ev("window.__somnium.walk(1)");
+t0 = Date.now();
+while (Date.now() - t0 < 16000 && (await ev("window.__somnium.scene()")) === 6) await sleep(200);
+await ev("window.__somnium.walk(0)");
+const backAtTitle = (await ev("window.__somnium.scene()")) === 1;
+console.log(backAtTitle ? "journey complete → title (cut confirmed)" : "FAIL: epilogue exit did not cut to title");
+await sleep(2600);
+await still("r6-title-return");
+
 const perf = await ev("window.__perf");
 console.log("perf:", JSON.stringify(perf));
 await browser.close();
