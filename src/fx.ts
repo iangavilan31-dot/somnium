@@ -29,6 +29,8 @@ export class Fx {
   private petalTimer = 1.5;
   private birdTimer = 9;
   private streakTimer = 18;
+  private emberTimer = 0.8;
+  private embers: Particle[] = [];
 
   constructor() {
     for (let i = 0; i < 26; i++) {
@@ -147,6 +149,24 @@ export class Fx {
       if (s.age >= s.life) { this.streaks.splice(i, 1); continue; }
       s.x += s.vx * dt; s.y += s.vy * dt;
     }
+    // embers rising off the sun-warmed band
+    this.emberTimer -= dt;
+    if (this.emberTimer <= 0 && this.embers.length < 10) {
+      this.emberTimer = 1.4 + this.R() * 2.2;
+      this.embers.push({
+        x: 850 + this.R() * 800, y: 920 + this.R() * 60,
+        vx: -(4 + this.R() * 9), vy: -(8 + this.R() * 9),
+        age: 0, life: 6 + this.R() * 3,
+        size: 1 + this.R() * 0.7, color: "#c25a28",
+      });
+    }
+    for (let i = this.embers.length - 1; i >= 0; i--) {
+      const e = this.embers[i];
+      e.age += dt;
+      if (e.age >= e.life) { this.embers.splice(i, 1); continue; }
+      e.x += (e.vx + Math.sin(e.age * 1.3) * 5) * dt;
+      e.y += e.vy * dt;
+    }
     // smear
     for (let i = this.smears.length - 1; i >= 0; i--) {
       this.smears[i].age += dt;
@@ -205,6 +225,15 @@ export class Fx {
       ctx.globalAlpha = Math.min(1, pulse * 1.8);
       ctx.fillStyle = "#ffb066";
       ctx.fillRect(f.x - 0.8, f.y - 0.8, 1.6, 1.6);
+    }
+    // embers — tiny warm sparks, pulsing
+    for (const e of this.embers) {
+      const u = e.age / e.life;
+      ctx.globalAlpha = 0.4 * Math.sin(Math.PI * Math.min(1, u * 1.1)) * (0.7 + 0.3 * Math.sin(e.age * 5));
+      ctx.fillStyle = e.color;
+      ctx.beginPath();
+      ctx.ellipse(e.x, e.y, e.size, e.size * 0.8, 0, 0, TAU);
+      ctx.fill();
     }
     // dust
     for (const p of this.parts) {

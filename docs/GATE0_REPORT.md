@@ -55,3 +55,19 @@ Budget headroom is enormous; 60fps bar cleared ~2.7× at the display's refresh c
    separation bands, axial brush strokes, chainmail speckle, tabard fold shadows.
 8. (pass 3) Attack anticipation blade overlapped the helm — windup re-posed
    (arm higher/deeper behind, blade angle flattened); silhouette now clean.
+9. (pass 5, Ian's "keep iterating" notes) Field de-uniformed: soil patches, flattened
+   wind trails, tall-grass islands, dead shrubs, mossy boulders; disc made celestial
+   (two-stage glow, haze veils, star-dissolve near the light, atmospheric extinction
+   darkening the lower limb); distinct dark-forest band added between valley and hill
+   (pines, skeletal dead trees, leaning monolith, two faint window-lights); second
+   tiny ruin far west; near-frame layer (giant flowers, tall blades, fallen log);
+   knight shrunk (zoom 1.30 → 1.08); warm glaze pass unifies all layers.
+10. (pass 5) Path read as a scar through the flowers — rerouted east to the
+   wayshrine, narrowed, lightened. Cloud crossing the sun was an opaque bite —
+   made translucent. Corner canopy cut: invisible under the vignette (an unseen
+   element isn't "intentionally placed").
+11. (perf hunt) Recorded fps ≠ game fps on this box: sub-native viewports throttle
+   Chromium's compositor to ~28fps (native 1920×1080 runs 165 — proof in
+   `scripts/diag-fps2.mjs`); in-page MediaRecorder drops frames AND compresses
+   timestamps (fast-motion lie). Final pipeline: native-res recordVideo, wall-true
+   timing, game at 165fps throughout, honest fps read from `window.__perf` only.

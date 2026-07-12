@@ -30,7 +30,7 @@ const fx = new Fx();
 const knight = new Knight(1250);
 const input = new Input();
 
-const ZOOM_WIDE = 0.88, ZOOM_MID = 1.30; // world dominates; knight stays small
+const ZOOM_WIDE = 0.88, ZOOM_MID = 1.08; // the world dwarfs the knight
 const cam = { x: 1200, zoom: ZOOM_WIDE };
 let t = 0;
 const skipTitle = location.search.includes("skip");
@@ -135,10 +135,10 @@ function render() {
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "medium";
 
-  const drawLayer = (layer: { canvas: HTMLCanvasElement; parallax: number; drift?: number }, alpha = 1) => {
+  const drawLayer = (layer: { canvas: HTMLCanvasElement; parallax: number; yOff: number; drift?: number }, alpha = 1) => {
     const p = layer.parallax;
     const redCam = cam.x * p + (1 - p) * (WORLD_W / 2);
-    const dy = gsY + (0 - GROUND_Y) * s;
+    const dy = gsY + (layer.yOff - GROUND_Y) * s;
     const w = (layer.canvas.width / PLATE_RES) * s;
     const h = (layer.canvas.height / PLATE_RES) * s;
     ctx.globalAlpha = alpha;
@@ -168,6 +168,8 @@ function render() {
   const wA = 0.5 + 0.5 * Math.sin(t * 0.85 + noise1(t * 0.3) * 1.3);
   drawLayer(scene.fgA, wA);
   drawLayer(scene.fgB, 1 - wA);
+  // nearest framing silhouettes (giant flowers, overhanging branch)
+  drawLayer(scene.near);
 
   // ---- grade passes ----
   // film grain (overlay, animated between 3 tiles)
@@ -180,10 +182,18 @@ function render() {
   ctx.restore();
   // vignette
   ctx.drawImage(vignette, 0, 0);
+  // painterly glaze — one warm translucent wash unifies every layer
+  // (plain source-over: 'soft-light' is not GPU-accelerated in Chromium and
+  // collapsed rAF to ~26fps under the screen recorder)
+  ctx.save();
+  ctx.globalAlpha = 0.055;
+  ctx.fillStyle = "#8a4a30";
+  ctx.fillRect(0, 0, cw, ch);
+  ctx.restore();
   // lifted blacks — nothing in a scanned paperback is true black
   ctx.save();
   ctx.globalCompositeOperation = "lighten";
-  ctx.fillStyle = "#120c0a";
+  ctx.fillStyle = "#150e0b";
   ctx.fillRect(0, 0, cw, ch);
   ctx.restore();
 

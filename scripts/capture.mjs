@@ -8,10 +8,15 @@ import { mkdirSync, writeFileSync } from "node:fs";
 const OUT = "docs/gate0";
 mkdirSync(`${OUT}/raw`, { recursive: true });
 
-const browser = await chromium.launch({ headless: false, args: ["--window-position=80,60"] });
+// 1920×1080 viewport is MANDATORY on this machine: smaller viewports drop the
+// compositor to ~28fps (proof: scripts/diag-fps2.mjs). At native res the game runs
+// 165fps while Playwright's recorder captures with wall-clock-true timing.
+// (In-page MediaRecorder was tried and rejected: it drops frames AND compresses
+// timestamps → fast-motion video that lies about animation timing.)
+const browser = await chromium.launch({ headless: false, args: ["--window-position=0,0"] });
 const context = await browser.newContext({
-  viewport: { width: 1600, height: 900 },
-  recordVideo: { dir: `${OUT}/raw`, size: { width: 1600, height: 900 } },
+  viewport: { width: 1920, height: 1080 },
+  recordVideo: { dir: `${OUT}/raw`, size: { width: 1920, height: 1080 } },
 });
 const page = await context.newPage();
 
@@ -24,6 +29,7 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 console.log("loading…");
 await page.goto("http://localhost:5131", { waitUntil: "load" });
+await page.bringToFront();
 await sleep(1800); // fonts + plate bake + fade from black
 
 await still("01-title");
@@ -80,6 +86,6 @@ console.log("perf:", JSON.stringify(perf));
 // one more idle beat so the video ends calm
 await sleep(1200);
 
-await context.close(); // flushes video
+await context.close(); // flushes recordVideo
 await browser.close();
 console.log("capture complete");
