@@ -4,15 +4,18 @@ _Laws in force: Review Board /goal (approaches → critique → synthesize per e
 Feel Gate (M&C §0) + World Gate (WB §0) → CANON_LOG line · 60fps headed on the RX 6600 ·
 animation-first (GEEKED/RIFT WARDEN died ignoring it) · banned list absolute._
 
-## Phase 1 — Spine (all 5 scenes traversable, co-op drop-in, whole journey walkable)
+## Phase 1 — Spine ✅ COMPLETE 2026-07-12 (proof: docs/journey/journey-v1.mp4 + full-0*.png)
 - [x] Gate 0 closed in docs (CLAUDE.md rule 3, SESSION_START, CANON_LOG)
-- [ ] 1a. Scene system: export paint helpers (additive), SceneDef + journey manager, main.ts consumes scenes[]
-- [ ] 1b. Two-knight drop-in co-op (P1 kbd/pad0, P2 pad; wake-rise on join; camera leashes both)
-- [ ] 1c. Scene 2 plates — Campfire Night (ember red in blue-green dark; monolith row, Loud Age castle, fire circle, lantern-line procession)
-- [ ] 1d. Scene 3 plates — Blue-Hour Village (orange on ultramarine; hood/cradle/kneeling silhouettes, lamp-moths, the beauty beat)
-- [ ] 1e. Scene 4 plates — Gothic Stair (magenta sky on black stone; wax-falls, kneeling statues, filled bell molds, chasm)
-- [ ] 1f. Scene 5 + epilogue plates — Black Tower snowfield (red on blue-white; mute Great Bell, clapper trench) / floating tree + pink moon
-- [ ] 1g. Campfire ritual (shared sleep = transition = save = drop-in), chapter whispers, Painter's Camera anchors + repose, journey walked end-to-end + captured
+- [x] 1a. Scene system: SceneDef + journey registry, lazy bakes, per-scene glaze/light/veil/whisper(+tint)
+- [x] 1b. Two-knight drop-in co-op (kbd=P1; pad claims P1 if kbd silent, else P2-join = wake-in; fit-both camera)
+- [x] 1c. Scene 2 CAMPFIRE NIGHT (closed-eye moon iter 3, Loud Age castle on knoll, monument monoliths w/ carved eyes, procession lantern-line, kettle tripod)
+- [x] 1d. Scene 3 BLUE-HOUR VILLAGE (vista town + kneeling sleep-tower + window constellation + star-dust river; street iter 4: real roofs, sleepers in windows, feral daisy box, garden walls, 2nd-rank layer, Warden's bracket lamp + moths)
+- [x] 1e. Scene 4 GOTHIC STAIR (inverted-horizon magenta slit, far wall w/ stair ribbon + wax rivulets + slit lights, punched arcade, mold choir, kneeling keepers, weirs + barge below, updraft bats)
+- [x] 1f. Scene 5 BLACK TOWER (mute Great Bell, dim Ember + breath veil, statue-ambiguous kneeling colossus, clapper trench, snowfall) + EPILOGUE (pink moon, floating tree on torn root-island, journey-complete → title loop)
+- [x] 1g. Fire ritual = transition = save = drop-in (proven by real input S1→…→title); whispers per chapter; light repose (full authored anchors → 4b); END-TO-END WALK RECORDED
+
+### Carried to Phase 4b (board notes)
+- S2 flame licks refine · S3 vista window readability at spawn · S4 crest softness, keeper prominence, buttress texture · S5 colossus stays ambiguous until Phase 3 · moving procession lanterns (S2) · full Painter's-Camera anchor fields · per-scene fg tuft pairs for S4/S5
 
 ## Phase 2 — Encounters
 - [ ] 2a. Full moveset per M&C §10 contracts (sprint, roll i-frames, 3-cut light combo, heavy, guard, Hush-parry held-breath, quieting, embrace-revive, collapse/crawl)

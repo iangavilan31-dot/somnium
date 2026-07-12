@@ -12,8 +12,9 @@ passes its Consistency Gate and lands one line in `docs/CANON_LOG.md`. No except
   FULL BUILD RUNNING under the Creative Review Board /goal (multiple approaches →
   critique → synthesize per element; only the One Law protected). S1 atmosphere =
   iteration 4 (Ember breathes, f7b5ac0). Phase order per BRIEF §7.9:
-  **Phase 1 spine (5 scenes + co-op drop-in + campfire transitions) ← CURRENT** →
-  Phase 2 encounters → Phase 3 minotaur → Phase 4 audio/polish/critics ≥85.
+  **Phase 1 spine ✅ COMPLETE** (all 6 chapters walkable end-to-end w/ real input,
+  proof `docs/journey/journey-v1.mp4`; 165fps settled every scene) →
+  **Phase 2 encounters ← CURRENT** → Phase 3 minotaur → Phase 4 audio/polish/critics ≥85.
 - **Next step:** see the task list mirror in `docs/BUILD_LEDGER.md` (kept current
   every commit). Resume = read that file, continue the top unchecked item.
 - **Laws in force:** animation-first gate · no cyan holo/scanlines/microtype · real

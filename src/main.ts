@@ -82,6 +82,7 @@ let wakeStarted = false;
 let titleSkipped = skipTitle;
 let whisperT = -1;
 let debugOn = false;
+let lastInputT = 0; // the repose: stillness invites the wide painting (M&C §1.5)
 
 // scene transition (the world re-dreams forward)
 let trans: "none" | "out" | "in" = skipTitle ? "none" : "none";
@@ -232,9 +233,16 @@ function sim(dt: number) {
     cam.zoom = lerp(ZOOM_WIDE, ZOOM_MID, easeInOutCubic(p));
     cam.x = damp(cam.x, p1.x + p1.facing * 30, 2.5, dt);
   } else if (p1.wakeDone) {
+    if (hub.anyKeyThisFrame || Math.abs(hub.p1.axis()) > 0.2 || Math.abs(hub.p2.axis()) > 0.2 || forcedAxis !== 0) {
+      lastInputT = t;
+    }
+    // the repose (light v1): both knights still ~4s → the camera exhales into the
+    // wide painting; any input takes it back instantly. Every pause is concept art.
+    const reposing = t - lastInputT > 4 && p1.state === "idle" && (!k2 || k2.state === "idle" || k2.state === "sit");
     const fitZoom = spread > 10 ? (cw * 0.55) / (vs * Math.max(spread, 1)) : ZOOM_MID;
-    const targetZoom = clamp(Math.min(ZOOM_MID, fitZoom), 0.74, ZOOM_MID) + Math.sin(t * 0.5) * 0.006;
-    cam.zoom = damp(cam.zoom, targetZoom, 2.2, dt);
+    const targetZoom = (clamp(Math.min(ZOOM_MID, fitZoom), 0.74, ZOOM_MID) + Math.sin(t * 0.5) * 0.006)
+      * (reposing ? 0.92 : 1);
+    cam.zoom = damp(cam.zoom, targetZoom, reposing ? 0.8 : 2.2, dt);
     const lead = present.length > 1 ? 0 : p1.facing * 46;
     cam.x = damp(cam.x, (minX + maxX) / 2 + lead, 3.2, dt);
     if (whisperT >= 0 || scene.id !== 1) { if (whisperT < 0) whisperT = 0; else whisperT += dt; }
