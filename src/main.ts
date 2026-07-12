@@ -1,12 +1,15 @@
-// SOMNIUM — Gate 0 spike: one knight, one painted slice of the Red-Sun Field.
-// Pipeline: plates → world (knight+fx) → foreground → grain → vignette → lifted blacks.
+// SOMNIUM — the journey. Pipeline: plates → world (knights+fx+fire) → foreground →
+// grain → vignette → glaze → lifted blacks. Scenes bake lazily; the campfire ritual
+// (rest together) re-dreams the world forward. Two knights, local drop-in.
 
 import { clamp, damp, easeInOutCubic, lerp, noise1 } from "./math";
-import { bakeEmberVeil, bakeGrainTiles, bakeScene, bakeVignette, GROUND_Y, PLATE_RES, SUN_R, SUN_X, SUN_Y, WORLD_W } from "./paint";
+import { bakeEmberVeil, bakeGrainTiles, bakeGlowSprite, bakeVignette, GROUND_Y, PLATE_RES, WORLD_W } from "./paint";
 import { Knight } from "./knight";
 import { Fx } from "./fx";
-import { Input } from "./input";
+import { InputHub, type PlayerInput } from "./input";
 import { drawDebug, type Perf } from "./debug";
+import { Campfire, SCENES, type SceneBake, type SceneDef } from "./journey";
+import "./scenes/index"; // registers scenes 2+ into SCENES
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ctx = canvas.getContext("2d")!;
@@ -24,15 +27,54 @@ function resize() {
 addEventListener("resize", resize);
 resize();
 
-const scene = bakeScene();
 const grain = bakeGrainTiles();
 const emberVeil = bakeEmberVeil();
+const fireGlow = bakeGlowSprite();
 const fx = new Fx();
-const knight = new Knight(1250);
-const input = new Input();
+const hub = new InputHub();
 
-const ZOOM_WIDE = 0.88, ZOOM_MID = 1.08; // the world dwarfs the knight
-const cam = { x: 1200, zoom: ZOOM_WIDE };
+// ---------- scenes ----------
+const bakes = new Map<number, SceneBake>();
+let sceneIdx = 0; // index into SCENES
+let scene: SceneDef = SCENES[0];
+let bake: SceneBake;
+let fire: Campfire | null = null;
+
+function enterScene(idx: number, freshKnights: boolean) {
+  sceneIdx = idx;
+  scene = SCENES[idx];
+  if (!bakes.has(scene.id)) bakes.set(scene.id, scene.bake());
+  bake = bakes.get(scene.id)!;
+  fire = scene.fireX != null ? new Campfire(scene.fireX) : null;
+  fx.setScene(scene.id);
+  for (const k of knights) {
+    if (!k) continue;
+    k.boundsL = scene.boundsL; k.boundsR = scene.boundsR;
+    k.lightX = scene.lightX;
+    if (freshKnights) {
+      k.resetToLying(scene.spawnX + (k === knights[1] ? 70 : 0));
+      k.startWake(); // every chapter opens with rising — the fiction of shared sleep
+    }
+  }
+  cam.x = scene.spawnX;
+  whisperT = scene.id === 1 ? -1 : 0; // scene 1's whisper waits for the wake
+}
+
+// ---------- knights ----------
+const knights: (Knight | null)[] = [new Knight(SCENES[0].spawnX), null];
+const p1 = knights[0]!;
+
+function joinP2() {
+  if (knights[1]) return;
+  const k = new Knight(clamp(p1.x + 80, scene.boundsL, scene.boundsR));
+  k.boundsL = scene.boundsL; k.boundsR = scene.boundsR; k.lightX = scene.lightX;
+  k.resetToLying(k.x);
+  k.startWake(); // P2 does not join a lobby. P2 wakes up.
+  knights[1] = k;
+}
+
+const ZOOM_WIDE = 0.88, ZOOM_MID = 1.08; // the world dwarfs the knights
+const cam = { x: SCENES[0].spawnX - 50, zoom: ZOOM_WIDE };
 let t = 0;
 const skipTitle = location.search.includes("skip");
 let seqT = skipTitle ? 4.55 : 0;
@@ -41,28 +83,55 @@ let titleSkipped = skipTitle;
 let whisperT = -1;
 let debugOn = false;
 
-// deterministic replay for capture: R restarts wake (not title)
+// scene transition (the world re-dreams forward)
+let trans: "none" | "out" | "in" = skipTitle ? "none" : "none";
+let transT = 0;
+const TRANS_S = 1.8;
+function beginTransition() {
+  if (trans !== "none") return;
+  trans = "out"; transT = 0;
+}
+
+// deterministic replay for capture: R restarts the current scene's entry
 function replay() {
-  knight.resetToLying(1250);
-  seqT = 4.55;
-  wakeStarted = false;
-  titleSkipped = true;
-  whisperT = -1;
-  cam.x = 1200; cam.zoom = ZOOM_WIDE;
+  if (scene.id === 1) {
+    p1.resetToLying(scene.spawnX);
+    seqT = 4.55;
+    wakeStarted = false;
+    titleSkipped = true;
+    whisperT = -1;
+    if (knights[1]) { knights[1].resetToLying(scene.spawnX + 70); knights[1].startWake(); }
+  } else {
+    enterScene(sceneIdx, true);
+  }
+  cam.x = scene.spawnX; cam.zoom = ZOOM_WIDE;
 }
 declare global {
   interface Window {
     __perf: Perf;
-    __somnium: { replay: () => void; state: () => string; attack: () => void; hit: () => void; walk: (ax: number) => void };
+    __somnium: {
+      replay: () => void; state: () => string; attack: () => void; hit: () => void;
+      walk: (ax: number) => void; scene: () => number; join2: () => void;
+      rest: (held: boolean) => void; skipToScene: (id: number) => void; x: () => number;
+    };
   }
 }
 let forcedAxis = 0;
+let forcedRest = false;
 window.__somnium = {
   replay,
-  state: () => knight.state,
-  attack: () => knight.tryAttack(),
-  hit: () => knight.tryHit(fx),
+  state: () => p1.state,
+  attack: () => p1.tryAttack(),
+  hit: () => p1.tryHit(fx),
   walk: (ax: number) => { forcedAxis = ax; },
+  scene: () => scene.id,
+  join2: joinP2,
+  rest: (held: boolean) => { forcedRest = held; },
+  skipToScene: (id: number) => {
+    const i = SCENES.findIndex((s) => s.id === id);
+    if (i >= 0) { enterScene(i, true); trans = "in"; transT = 0; }
+  },
+  x: () => p1.x,
 };
 
 const perf: Perf = { fps: 60, simMs: 0, renderMs: 0 };
@@ -72,54 +141,100 @@ window.__perf = perf;
 const DT = 1 / 120;
 let acc = 0, last = performance.now();
 
+function knightInput(k: Knight, inp: PlayerInput, dt: number, forced: boolean) {
+  const axis = forced && forcedAxis !== 0 ? forcedAxis : inp.axis();
+  if (inp.attackPressed()) k.tryAttack();
+  if (inp.hitPressed()) k.tryHit(fx);
+  // the rest ritual — only near the fire, only when the scene has one
+  const nearFire = fire != null && Math.abs(k.x - fire.x) < 90;
+  const restWanted = (forced && forcedRest) || inp.restHeld();
+  k.setRest(restWanted && nearFire, fire ? fire.x : k.x);
+  k.update(dt, k.sitting ? 0 : axis, t, fx);
+  if (k.attackSmearActive()) {
+    const [tx, ty] = k.swordTipWorld();
+    const [gx, gy] = k.swordGuardWorld();
+    fx.smear(tx, ty, gx, gy);
+  }
+}
+
 function sim(dt: number) {
   t += dt;
   seqT += dt;
-  input.pollPad();
+  hub.pollPads();
 
-  if (!wakeStarted && seqT >= 4.9) {
+  // title → scene 1 wake (first boot only)
+  if (scene.id === 1 && !wakeStarted && seqT >= 4.9) {
     wakeStarted = true;
-    knight.startWake();
+    p1.startWake();
   }
-  if (input.anyKeyThisFrame && seqT < 4.4 && !titleSkipped) {
+  if (hub.anyKeyThisFrame && seqT < 4.4 && !titleSkipped) {
     titleSkipped = true;
     seqT = 4.55;
   }
 
-  const playable = knight.wakeDone;
-  const axis = playable ? (forcedAxis !== 0 ? forcedAxis : input.axis()) : 0;
-  if (playable) {
-    if (input.attackPressed()) knight.tryAttack();
-    if (input.hitPressed()) knight.tryHit(fx);
-  }
-  if (input.replayPressed()) replay();
-  if (input.debugPressed()) debugOn = !debugOn;
+  // drop-in
+  if (hub.p2JoinRequested) joinP2();
 
-  knight.update(dt, axis, t, fx);
-  if (knight.attackSmearActive()) {
-    const [tx, ty] = knight.swordTipWorld();
-    const [gx, gy] = knight.swordGuardWorld();
-    fx.smear(tx, ty, gx, gy);
+  const playable = p1.wakeDone && trans === "none";
+  if (playable) knightInput(p1, hub.p1, dt, true);
+  else p1.update(dt, 0, t, fx);
+  const k2 = knights[1];
+  if (k2) {
+    if (trans === "none") knightInput(k2, hub.p2, dt, false);
+    else k2.update(dt, 0, t, fx);
   }
+
+  if (hub.p1.replayPressed()) replay();
+  if (hub.debugPressed()) debugOn = !debugOn;
+
   fx.update(dt);
+  fire?.update(dt);
 
-  // camera
-  if (wakeStarted && !knight.wakeDone) {
-    const p = clamp(knight.stateT / 4.25, 0, 1);
-    cam.zoom = lerp(ZOOM_WIDE, ZOOM_MID, easeInOutCubic(p));
-    cam.x = damp(cam.x, knight.x + knight.facing * 30, 2.5, dt);
-  } else if (knight.wakeDone) {
-    cam.zoom = ZOOM_MID + Math.sin(t * 0.5) * 0.006;
-    cam.x = damp(cam.x, knight.x + knight.facing * 46, 3.2, dt);
-    if (whisperT < 0) whisperT = 0; else whisperT += dt;
-  } else {
-    cam.x = 1200 + noise1(t * 0.1) * 6; // title drift
+  // ---- transitions ----
+  if (trans === "none" && playable && sceneIdx + 1 < SCENES.length) {
+    // edge-exit scenes (S1: dusk takes the field; epilogue: waking)
+    if (scene.exitEastX != null && p1.x >= scene.exitEastX && (!k2 || k2.x >= scene.exitEastX - 140)) {
+      beginTransition();
+    }
+    // fire-rest scenes: every present knight settled at the fire
+    if (fire && p1.sitSettled && (!k2 || k2.sitSettled)) beginTransition();
   }
+  if (trans !== "none") {
+    transT += dt;
+    if (trans === "out" && transT >= TRANS_S) {
+      const next = Math.min(sceneIdx + 1, SCENES.length - 1);
+      if (next !== sceneIdx) enterScene(next, true);
+      trans = "in"; transT = 0;
+    } else if (trans === "in" && transT >= TRANS_S) {
+      trans = "none"; transT = 0;
+    }
+  }
+
+  // ---- camera: frame every knight, keep the painting ----
+  const present = knights.filter((k): k is Knight => !!k);
+  const minX = Math.min(...present.map((k) => k.x));
+  const maxX = Math.max(...present.map((k) => k.x));
+  const spread = maxX - minX;
   const vs = Math.max(cw / 1920, ch / 1080);
+
+  if (scene.id === 1 && wakeStarted && !p1.wakeDone) {
+    const p = clamp(p1.stateT / 4.25, 0, 1);
+    cam.zoom = lerp(ZOOM_WIDE, ZOOM_MID, easeInOutCubic(p));
+    cam.x = damp(cam.x, p1.x + p1.facing * 30, 2.5, dt);
+  } else if (p1.wakeDone) {
+    const fitZoom = spread > 10 ? (cw * 0.55) / (vs * Math.max(spread, 1)) : ZOOM_MID;
+    const targetZoom = clamp(Math.min(ZOOM_MID, fitZoom), 0.74, ZOOM_MID) + Math.sin(t * 0.5) * 0.006;
+    cam.zoom = damp(cam.zoom, targetZoom, 2.2, dt);
+    const lead = present.length > 1 ? 0 : p1.facing * 46;
+    cam.x = damp(cam.x, (minX + maxX) / 2 + lead, 3.2, dt);
+    if (whisperT >= 0 || scene.id !== 1) { if (whisperT < 0) whisperT = 0; else whisperT += dt; }
+  } else {
+    cam.x = scene.spawnX - 50 + noise1(t * 0.1) * 6; // title drift
+  }
   const halfView = cw / (2 * vs * cam.zoom);
   cam.x = halfView >= WORLD_W / 2 ? WORLD_W / 2 : clamp(cam.x, halfView, WORLD_W - halfView);
 
-  input.endFrame();
+  hub.endFrame();
 }
 
 // ---------- render ----------
@@ -155,48 +270,47 @@ function render() {
     ctx.globalAlpha = 1;
   };
 
-  for (const l of scene.layers) drawLayer(l);
+  for (const l of bake.layers) drawLayer(l);
 
-  // THE EMBER BREATHES (World Bible §1) — an ~8.5s swell over everything the
-  // Ember lights. Keeper-lights (tower windows, fireflies) keep their own time:
-  // two kinds of light in this world — the Dreamer's, and somebody's work (Law 6).
+  // THE WORLD BREATHES (World Bible §1) — an ~8.5s swell of everything the world's
+  // own light touches. Keeper-lights and fireflies keep their own time (Law 6).
   const breath = Math.pow(0.5 + 0.5 * Math.sin(t * ((Math.PI * 2) / 8.5)), 1.35);
-  {
-    const pSky = 0.04; // the sky plate's parallax — anchors the veil on the disc
-    const skyCam = cam.x * pSky + (1 - pSky) * (WORLD_W / 2);
-    const sx = cx + (SUN_X - skyCam) * s;
-    const sy = gsY + (SUN_Y - GROUND_Y) * s;
+  if (scene.veil) {
+    const v = scene.veil;
+    const skyCam = cam.x * v.parallax + (1 - v.parallax) * (WORLD_W / 2);
+    const sx = cx + (v.x - skyCam) * s;
+    const sy = gsY + (v.y - GROUND_Y) * s;
     ctx.save();
     ctx.globalCompositeOperation = "lighter";
-    const rOut = SUN_R * 4.6 * s;
-    ctx.globalAlpha = 0.058 * breath;
+    const rOut = v.r * 4.6 * s;
+    ctx.globalAlpha = v.outA * breath;
     ctx.drawImage(emberVeil, sx - rOut, sy - rOut, rOut * 2, rOut * 2);
-    const rIn = SUN_R * 2.1 * s;
-    ctx.globalAlpha = 0.078 * breath;
+    const rIn = v.r * 2.1 * s;
+    ctx.globalAlpha = v.inA * breath;
     ctx.drawImage(emberVeil, sx - rIn, sy - rIn, rIn * 2, rIn * 2);
     ctx.restore();
   }
 
-  // world pass (knight + fx share world coords)
+  // world pass (fire + knights + fx share world coords)
   ctx.save();
   ctx.translate(cx + (0 - cam.x) * s, gsY + (0 - GROUND_Y) * s);
   ctx.scale(s, s);
   fx.draw(ctx);
-  knight.draw(ctx);
+  fire?.draw(ctx, GROUND_Y, fireGlow, t);
+  for (const k of knights) k?.draw(ctx);
   ctx.restore();
 
-  // thorn sentinel — just in front of the play plane, frames the west edge
-  drawLayer(scene.thorn);
-  // foreground tufts — two baked variants crossfaded; the air is dead-still
-  // (Chapter 1 law), so the lean rides the Ember's breath, not a wind
-  const wA = 0.5 + 0.42 * Math.sin(t * 0.85 + noise1(t * 0.3) * 1.3) + 0.16 * (breath - 0.5);
-  drawLayer(scene.fgA, wA);
-  drawLayer(scene.fgB, 1 - wA);
-  // nearest framing silhouettes (giant flowers, overhanging branch)
-  drawLayer(scene.near);
+  // mid layers — just in front of the play plane (thorn sentinel etc.)
+  if (bake.mid) for (const m of bake.mid) drawLayer(m);
+  // foreground tufts — the lean rides the world's breath (the air is dead-still)
+  if (bake.fgA && bake.fgB) {
+    const wA = 0.5 + 0.42 * Math.sin(t * 0.85 + noise1(t * 0.3) * 1.3) + 0.16 * (breath - 0.5);
+    drawLayer(bake.fgA, wA);
+    drawLayer(bake.fgB, 1 - wA);
+  }
+  if (bake.near) drawLayer(bake.near);
 
   // ---- grade passes ----
-  // film grain (overlay, animated between 3 tiles)
   const tile = grain[Math.floor(t * 9) % 3];
   ctx.save();
   ctx.globalCompositeOperation = "overlay";
@@ -204,14 +318,11 @@ function render() {
   ctx.fillStyle = ctx.createPattern(tile, "repeat")!;
   ctx.fillRect(0, 0, cw, ch);
   ctx.restore();
-  // vignette
   ctx.drawImage(vignette, 0, 0);
-  // painterly glaze — one warm translucent wash unifies every layer
-  // (plain source-over: 'soft-light' is not GPU-accelerated in Chromium and
-  // collapsed rAF to ~26fps under the screen recorder)
+  // painterly glaze — the scene's unifying wash, breathing gently
   ctx.save();
-  ctx.globalAlpha = 0.050 + 0.010 * breath; // the whole frame inhales warmth with the Ember
-  ctx.fillStyle = "#8a4a30";
+  ctx.globalAlpha = scene.glazeBase + scene.glazeBreath * breath;
+  ctx.fillStyle = scene.glaze;
   ctx.fillRect(0, 0, cw, ch);
   ctx.restore();
   // lifted blacks — nothing in a scanned paperback is true black
@@ -222,7 +333,7 @@ function render() {
   ctx.restore();
 
   drawText(vs);
-  if (debugOn) drawDebug(ctx, perf, knight.state, cam.zoom, dpr);
+  if (debugOn) drawDebug(ctx, perf, p1.state, cam.zoom, dpr);
 }
 
 function fadeAlpha(x: number, inS: number, inE: number, outS: number, outE: number) {
@@ -232,6 +343,10 @@ function fadeAlpha(x: number, inS: number, inE: number, outS: number, outE: numb
   return 1;
 }
 
+function serif(px: number, vs: number) {
+  return `400 ${Math.round(px * (vs / dpr))}px "Cormorant Garamond", Georgia, serif`;
+}
+
 function drawText(vs: number) {
   ctx.save();
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -239,7 +354,7 @@ function drawText(vs: number) {
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
 
-  if (!titleSkipped) {
+  if (!titleSkipped && scene.id === 1) {
     const aT = fadeAlpha(seqT, 0.9, 2.0, 3.5, 4.5);
     if (aT > 0) {
       ctx.globalAlpha = aT * 0.88;
@@ -252,7 +367,7 @@ function drawText(vs: number) {
     if (aTag > 0) {
       ctx.globalAlpha = aTag * 0.6;
       ctx.fillStyle = "#c9bda9";
-      ctx.font = `400 ${Math.round(21 * (vs / dpr))}px "Cormorant Garamond", Georgia, serif`;
+      ctx.font = serif(21, vs);
       try { (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "4px"; } catch { /* older engines */ }
       ctx.fillText("wake in a world", w / 2 + 2, h * 0.40 + 52 * (vs / dpr));
     }
@@ -263,22 +378,27 @@ function drawText(vs: number) {
     if (aW > 0) {
       ctx.globalAlpha = aW * 0.68;
       ctx.fillStyle = "#d5cabc";
-      ctx.font = `400 ${Math.round(26 * (vs / dpr))}px "Cormorant Garamond", Georgia, serif`;
+      ctx.font = serif(26, vs);
       try { (ctx as CanvasRenderingContext2D & { letterSpacing: string }).letterSpacing = "3px"; } catch { /* older engines */ }
-      ctx.fillText("What will you do?", w / 2, h * 0.34);
+      ctx.fillText(scene.whisper, w / 2, h * 0.34);
     }
   }
 
-  // opening fade from black
-  const aBlack = 1 - clamp(seqT / 1.4, 0, 1);
-  if (aBlack > 0) {
-    ctx.globalAlpha = aBlack;
+  // opening fade from black + scene transitions
+  let black = 1 - clamp(seqT / 1.4, 0, 1);
+  if (trans === "out") black = Math.max(black, easeInOutCubic(clamp(transT / TRANS_S, 0, 1)));
+  if (trans === "in") black = Math.max(black, 1 - easeInOutCubic(clamp(transT / TRANS_S, 0, 1)));
+  if (black > 0) {
+    ctx.globalAlpha = black;
     ctx.fillStyle = "#000";
     ctx.fillRect(0, 0, w, h);
   }
   ctx.restore();
   ctx.globalAlpha = 1;
 }
+
+// ---------- boot ----------
+enterScene(0, false);
 
 // ---------- loop ----------
 let fpsEma = 60;

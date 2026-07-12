@@ -36,6 +36,7 @@ export class Fx {
   private embers: Particle[] = [];
   private ashTimer = 0.6;
   private ashes: Petal[] = [];
+  private sceneId = 1; // gates scene-flavored ambient systems
 
   constructor() {
     for (let i = 0; i < 26; i++) {
@@ -52,6 +53,26 @@ export class Fx {
       this.fireflies.push({ x: bx, y: by, bx, by, ph: this.R() * TAU, ph2: this.R() * TAU });
     }
   }
+
+  // scene change: clear transient particles; scene-specific spawners gate on sceneId
+  setScene(id: number) {
+    this.sceneId = id;
+    this.parts.length = 0;
+    this.petals.length = 0;
+    this.ashes.length = 0;
+    this.embers.length = 0;
+    this.streaks.length = 0;
+    this.smears.length = 0;
+    this.birds.length = 0;
+    this.moths.length = 0;
+    if (id === 3) {
+      // the Moth Warden's street lamp (scene3.ts S3_LAMP) — her moths never leave it
+      for (let i = 0; i < 6; i++) {
+        this.moths.push({ x: 1982, y: 872, bx: 1982, by: 872, ph: this.R() * TAU, ph2: this.R() * TAU });
+      }
+    }
+  }
+  private moths: Firefly[] = [];
 
   dust(x: number, y: number, n: number, dir: number) {
     for (let i = 0; i < n; i++) {
@@ -88,9 +109,9 @@ export class Fx {
       if (m.x > WORLD_W) m.x -= WORLD_W;
       if (m.y < 420) m.y = 1000; if (m.y > 1040) m.y = 460;
     }
-    // petals drifting off the flower field
+    // petals drifting off the flower field (Scene 1's wake-scar)
     this.petalTimer -= dt;
-    if (this.petalTimer <= 0 && this.petals.length < 14) {
+    if (this.sceneId === 1 && this.petalTimer <= 0 && this.petals.length < 14) {
       this.petalTimer = 1.2 + this.R() * 1.4;
       this.petals.push({
         x: 1050 + this.R() * 500, y: 915 + this.R() * 40,
@@ -107,7 +128,15 @@ export class Fx {
       p.x += (p.vx + Math.sin(p.age * 1.6 + p.sway) * 10) * dt;
       p.y += (p.vy + Math.sin(p.age * 2.3 + p.sway) * 4) * dt;
     }
-    // fireflies wander near their base
+    // lamp-moths — slow orbits around the Warden's light, wobbling on paper wings
+    for (const m of this.moths) {
+      m.ph += dt * (0.9 + 0.4 * Math.sin(m.ph2));
+      m.ph2 += dt * 0.31;
+      const rr = 16 + Math.sin(m.ph2 * 1.7) * 9;
+      m.x = m.bx + Math.cos(m.ph) * rr + Math.sin(m.ph2 * 3.1) * 3;
+      m.y = m.by + Math.sin(m.ph) * rr * 0.55 + Math.sin(m.ph2 * 2.3) * 4;
+    }
+    // fireflies wander near their base (S1 + S3 canon; hidden elsewhere)
     for (const f of this.fireflies) {
       f.ph += dt * (0.5 + 0.3 * Math.sin(f.ph2));
       f.ph2 += dt * 0.23;
@@ -157,7 +186,7 @@ export class Fx {
     // ash-petals falling off the Ember — dark flecks, silhouetted only where they
     // cross the disc and its glow. Slow (Law 5: all ambient motion is drift).
     this.ashTimer -= dt;
-    if (this.ashTimer <= 0 && this.ashes.length < 12) {
+    if (this.sceneId === 1 && this.ashTimer <= 0 && this.ashes.length < 12) {
       this.ashTimer = 0.9 + this.R() * 1.3;
       this.ashes.push({
         x: 800 + this.R() * 700, y: 320 + this.R() * 300,
@@ -176,7 +205,7 @@ export class Fx {
     }
     // embers rising off the sun-warmed band
     this.emberTimer -= dt;
-    if (this.emberTimer <= 0 && this.embers.length < 10) {
+    if (this.sceneId === 1 && this.emberTimer <= 0 && this.embers.length < 10) {
       this.emberTimer = 1.4 + this.R() * 2.2;
       this.embers.push({
         x: 850 + this.R() * 800, y: 920 + this.R() * 60,
@@ -251,7 +280,17 @@ export class Fx {
       ctx.ellipse(p.x, p.y, p.size, p.size * 0.6, Math.sin(p.age * 2 + p.sway) * 0.8, 0, TAU);
       ctx.fill();
     }
-    // fireflies — baked glow sprite + hot core
+    // lamp-moths — pale wings that only exist where the lamp's light reaches
+    for (const m of this.moths) {
+      const flap = 0.5 + 0.5 * Math.sin(m.ph2 * 14);
+      ctx.globalAlpha = 0.4 + flap * 0.3;
+      ctx.fillStyle = "#d8c9a8";
+      ctx.beginPath();
+      ctx.ellipse(m.x, m.y, 1.6 + flap * 1.2, 1.1, Math.sin(m.ph) * 0.6, 0, TAU);
+      ctx.fill();
+    }
+    // fireflies — baked glow sprite + hot core (S1/S3 only, WORLD_BIBLE §3 fauna)
+    if (this.sceneId === 1 || this.sceneId === 3)
     for (const f of this.fireflies) {
       const pulse = 0.16 + 0.34 * (0.5 + 0.5 * Math.sin(f.ph * 2.3 + f.ph2));
       ctx.globalAlpha = pulse;

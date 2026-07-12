@@ -23,7 +23,7 @@ export interface Layer {
 // Banded plates: full-height plates (14 × 3120×1664 ≈ 280MB of textures) thrashed
 // GPU memory under any per-frame capture readback. Each plate spans only its band;
 // content is still authored in world coords via the translate.
-function makeCanvas(yTop: number, yBot: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
+export function makeCanvas(yTop: number, yBot: number): [HTMLCanvasElement, CanvasRenderingContext2D] {
   const c = document.createElement("canvas");
   c.width = Math.ceil(WORLD_W * PLATE_RES);
   c.height = Math.ceil((yBot - yTop) * PLATE_RES);
@@ -33,7 +33,7 @@ function makeCanvas(yTop: number, yBot: number): [HTMLCanvasElement, CanvasRende
   return [c, ctx];
 }
 
-function dab(
+export function dab(
   ctx: CanvasRenderingContext2D,
   x: number, y: number, w: number, h: number, rot: number,
   color: string, alpha = 1,
@@ -50,7 +50,7 @@ function dab(
 }
 
 // organic ridgeline: random-walk in small steps, gravity toward base
-function ridgeline(
+export function ridgeline(
   ctx: CanvasRenderingContext2D, baseY: number, amp: number, color: string, seed: number,
 ) {
   const r2 = mulberry32(seed);
@@ -74,7 +74,7 @@ function ridgeline(
 
 // painterly cumulus mass — billowed body dabs + crimson under-lit base edge.
 // rim = strength of the sun-side under-lighting (0 = unlit silhouette).
-function cloudMass(
+export function cloudMass(
   ctx: CanvasRenderingContext2D, R: () => number,
   cx: number, cy: number, w: number, h: number,
   body: string, alpha: number, rim: number,
@@ -384,7 +384,7 @@ function bakeValley(): Layer {
   return { canvas: c, parallax: 0.16, yOff: 740 };
 }
 
-function bakeFog(seed: number, yLo: number, yHi: number, color: string, near: boolean): Layer {
+export function bakeFog(seed: number, yLo: number, yHi: number, color: string, near: boolean): Layer {
   const [c, ctx] = makeCanvas(near ? 810 : 740, near ? 990 : 930);
   const R = mulberry32(seed);
   for (let i = 0; i < (near ? 26 : 34); i++) {
@@ -871,7 +871,7 @@ function bakeGround(): Layer {
 }
 
 // one-time soft-focus for the nearest plates — painted depth-of-field, not runtime blur
-function soften(c: HTMLCanvasElement, px: number): HTMLCanvasElement {
+export function soften(c: HTMLCanvasElement, px: number): HTMLCanvasElement {
   const b = document.createElement("canvas");
   b.width = c.width; b.height = c.height;
   const bctx = b.getContext("2d")!;

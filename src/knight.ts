@@ -2,7 +2,7 @@
 // Principles enforced here: anticipation, follow-through, weight, silhouette.
 
 import { clamp, damp, easeInCubic, easeInOutCubic, easeOutCubic, lerp, noise1, rad, TAU, type Ease } from "./math";
-import { GROUND_Y, SUN_X } from "./paint";
+import { GROUND_Y } from "./paint";
 import type { Fx } from "./fx";
 
 // ---- proportions (world px) ----
@@ -117,7 +117,14 @@ const SPECKLE: [number, number][] = [
 const CLOAK_N = 7, CLOAK_LINK = 12.5;
 interface CNode { x: number; y: number; px: number; py: number }
 
-export type KnightState = "prelude" | "wake" | "idle" | "walk" | "attack" | "hit";
+export type KnightState = "prelude" | "wake" | "idle" | "walk" | "attack" | "hit" | "sit";
+
+// seated at the fire — legs folded, sword across the lap, head toward the flame
+const SIT = P({
+  pelvisY: 33, torso: 18, head: 10,
+  shL: 14, elL: 44, shR: 26, elR: 50, sword: -84,
+  hipL: 82, shinL: -64, hipR: -58, shinR: 48,
+});
 
 export class Knight {
   x: number; facing = 1;
@@ -126,6 +133,8 @@ export class Knight {
   cur: Pose = { ...LYING };
   walkPhase = 0;
   vx = 0; // knockback impulse velocity
+  boundsL = 320; boundsR = 2100; // set per scene by the journey
+  lightX = 1150;                 // key-light x — shadows point away (set per scene)
   private lastStepSign = 0;
   private cloak: CNode[] = [];
   private smearFrom = 0;
@@ -149,6 +158,17 @@ export class Knight {
   tryAttack() {
     if (this.state === "idle" || this.state === "walk") { this.state = "attack"; this.stateT = 0; }
   }
+  // the rest ritual: caller decides eligibility (near a fire); any movement stands back up
+  setRest(held: boolean, faceX: number) {
+    if (held && (this.state === "idle" || this.state === "walk")) {
+      this.state = "sit"; this.stateT = 0;
+      this.facing = faceX >= this.x ? 1 : -1;
+    } else if (!held && this.state === "sit") {
+      this.state = "idle"; this.stateT = 0;
+    }
+  }
+  get sitting() { return this.state === "sit"; }
+  get sitSettled() { return this.state === "sit" && this.stateT > 1.1; }
   tryHit(fx: Fx) {
     if (this.state === "wake" || this.state === "prelude") return;
     this.state = "hit"; this.stateT = 0;
@@ -164,7 +184,7 @@ export class Knight {
     this.stateT += dt;
     this.hitFlash = Math.max(0, this.hitFlash - dt);
 
-    // locomotion
+    // locomotion (moving stands a sitting knight back up)
     if (!this.busy()) {
       if (Math.abs(axis) > 0.2) {
         this.state = "walk";
@@ -178,7 +198,7 @@ export class Knight {
     }
     this.x += this.vx * dt;
     this.vx = damp(this.vx, 0, 9, dt);
-    this.x = clamp(this.x, 320, 2100);
+    this.x = clamp(this.x, this.boundsL, this.boundsR);
 
     // pose target
     let target: Pose;
@@ -206,6 +226,15 @@ export class Knight {
         target = sampleTimeline(HIT, this.stateT);
         rate = 24;
         if (this.stateT >= HIT[HIT.length - 1].t) { this.state = "idle"; this.stateT = 0; }
+        break;
+      }
+      case "sit": {
+        // ease down slowly (a knight in plate does not flop), then breathe by the fire
+        target = { ...SIT };
+        target.pelvisY += Math.sin(t * 0.85) * 1.2;
+        target.torso += rad(Math.sin(t * 0.85) * 0.8);
+        target.head += rad(noise1(t * 0.22) * 4);
+        rate = this.stateT < 1.0 ? 5 : 9;
         break;
       }
       case "walk": {
@@ -361,7 +390,7 @@ export class Knight {
     // long shadow thrown away from the sun (cinematic key light)
     const lowY = Math.max(p.ftF[1], p.ftN[1], p.pel[1] + 8);
     const feetX = (p.ftF[0] + p.ftN[0]) / 2;
-    const shadowDir = (this.x >= SUN_X ? 1 : -1) * this.facing; // world dir → local
+    const shadowDir = (this.x >= this.lightX ? 1 : -1) * this.facing; // world dir → local
     ctx.globalAlpha = 0.16;
     ctx.fillStyle = "#020302";
     ctx.beginPath();

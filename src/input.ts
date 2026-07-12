@@ -1,57 +1,108 @@
-// Keyboard + gamepad. Edge-triggered actions, polled axis.
+// Two-player input — the CROAKDOWN drop-in model, fiction-native.
+// Keyboard always drives P1. Pads claim slots on first button press:
+// a pad claims P1 if no pad owns P1 AND the keyboard hasn't spoken since the wake;
+// otherwise it claims P2 (which IS the join signal — P2 wakes into the scene).
+// No lobby, no prompt: pressing a button on a second controller is "waking up".
 
-export class Input {
-  private keys = new Set<string>();
-  private edges = new Set<string>();
+const P1_KEYS_AXIS_NEG = ["ArrowLeft", "KeyA"];
+const P1_KEYS_AXIS_POS = ["ArrowRight", "KeyD"];
+
+export class PlayerInput {
+  padIndex = -1; // claimed pad, -1 = none
+  useKeyboard = false;
+  private hub: InputHub;
+  constructor(hub: InputHub, useKeyboard: boolean) {
+    this.hub = hub;
+    this.useKeyboard = useKeyboard;
+  }
+  private pad(): Gamepad | null {
+    if (this.padIndex < 0) return null;
+    const p = navigator.getGamepads ? navigator.getGamepads()[this.padIndex] : null;
+    return p && p.connected ? p : null;
+  }
+  axis(): number {
+    let a = 0;
+    if (this.useKeyboard) {
+      for (const k of P1_KEYS_AXIS_NEG) if (this.hub.keys.has(k)) a -= 1;
+      for (const k of P1_KEYS_AXIS_POS) if (this.hub.keys.has(k)) a += 1;
+    }
+    const p = this.pad();
+    if (p) {
+      if (Math.abs(p.axes[0]) > 0.25) a += p.axes[0];
+      if (p.buttons[14]?.pressed) a -= 1;
+      if (p.buttons[15]?.pressed) a += 1;
+    }
+    return Math.max(-1, Math.min(1, a));
+  }
+  private padEdge(b: number) { return this.padIndex >= 0 && this.hub.padEdges.get(this.padIndex)?.has(b); }
+  private key(c: string) { return this.useKeyboard && this.hub.edges.has(c); }
+  private keyHeld(c: string) { return this.useKeyboard && this.hub.keys.has(c); }
+  private padHeld(b: number) {
+    const p = this.pad();
+    return !!p?.buttons[b]?.pressed;
+  }
+  attackPressed() { return this.key("KeyJ") || this.key("KeyX") || this.padEdge(0); } // cross/A
+  hitPressed() { return this.key("KeyH") || this.padEdge(2); } // debug harm
+  restHeld() { return this.keyHeld("KeyS") || this.keyHeld("ArrowDown") || this.padHeld(1); } // circle/B held = rest at fire
+  replayPressed() { return this.key("KeyR") || this.padEdge(9); }
+}
+
+export class InputHub {
+  keys = new Set<string>();
+  edges = new Set<string>();
+  padEdges = new Map<number, Set<number>>();
   anyKeyThisFrame = false;
+  keyboardSpoke = false; // has the keyboard EVER driven movement/attack this scene
+  p1: PlayerInput;
+  p2: PlayerInput;
+  p2JoinRequested = false; // set the frame an unclaimed pad claims P2
+
+  private padPrev = new Map<number, Set<number>>();
 
   constructor() {
+    this.p1 = new PlayerInput(this, true);
+    this.p2 = new PlayerInput(this, false);
     window.addEventListener("keydown", (e) => {
       if (e.repeat) return;
       this.keys.add(e.code);
       this.edges.add(e.code);
       this.anyKeyThisFrame = true;
+      this.keyboardSpoke = true;
     });
     window.addEventListener("keyup", (e) => this.keys.delete(e.code));
     window.addEventListener("blur", () => this.keys.clear());
   }
 
-  private pad(): Gamepad | null {
+  pollPads() {
+    this.p2JoinRequested = false;
     const pads = navigator.getGamepads ? navigator.getGamepads() : [];
-    for (const p of pads) if (p && p.connected) return p;
-    return null;
-  }
-  private padPrev = new Set<number>();
-  private padEdges = new Set<number>();
-
-  pollPad() {
-    const p = this.pad();
-    this.padEdges.clear();
-    if (!p) return;
-    p.buttons.forEach((b, i) => {
-      if (b.pressed && !this.padPrev.has(i)) { this.padEdges.add(i); this.anyKeyThisFrame = true; }
-      if (b.pressed) this.padPrev.add(i); else this.padPrev.delete(i);
-    });
-  }
-
-  axis(): number {
-    let a = 0;
-    if (this.keys.has("ArrowLeft") || this.keys.has("KeyA")) a -= 1;
-    if (this.keys.has("ArrowRight") || this.keys.has("KeyD")) a += 1;
-    const p = this.pad();
-    if (p && Math.abs(p.axes[0]) > 0.25) a += p.axes[0];
-    if (p) {
-      if (p.buttons[14]?.pressed) a -= 1; // dpad
-      if (p.buttons[15]?.pressed) a += 1;
+    for (let i = 0; i < pads.length; i++) {
+      const p = pads[i];
+      if (!p || !p.connected) continue;
+      let prev = this.padPrev.get(i);
+      if (!prev) { prev = new Set(); this.padPrev.set(i, prev); }
+      let edges = this.padEdges.get(i);
+      if (!edges) { edges = new Set(); this.padEdges.set(i, edges); }
+      edges.clear();
+      let anyPress = false;
+      p.buttons.forEach((b, bi) => {
+        if (b.pressed && !prev.has(bi)) { edges.add(bi); anyPress = true; this.anyKeyThisFrame = true; }
+        if (b.pressed) prev.add(bi); else prev.delete(bi);
+      });
+      // slot claiming — the drop-in doorway
+      const claimed = i === this.p1.padIndex || i === this.p2.padIndex;
+      if (anyPress && !claimed) {
+        if (this.p1.padIndex < 0 && !this.keyboardSpoke) {
+          this.p1.padIndex = i; // solo pad play: first pad is P1
+        } else if (this.p2.padIndex < 0) {
+          this.p2.padIndex = i;
+          this.p2JoinRequested = true; // P2 wakes up
+        }
+      }
     }
-    return Math.max(-1, Math.min(1, a));
   }
 
-  attackPressed() { return this.edges.has("KeyJ") || this.edges.has("KeyX") || this.padEdges.has(0); }
-  hitPressed() { return this.edges.has("KeyH") || this.padEdges.has(2); }
-  replayPressed() { return this.edges.has("KeyR") || this.padEdges.has(9); }
   debugPressed() { return this.edges.has("F1"); }
-
   endFrame() {
     this.edges.clear();
     this.anyKeyThisFrame = false;
