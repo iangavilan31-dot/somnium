@@ -47,3 +47,4 @@ _Format: date · element (type) · gate verdict · scene/hue · one-line law-fit
 - 2026-07-12 · The Ember breathes (visual, §1 hook now LIVE) · PASS W/ FLAG · S1 · ~8.5s barely-perceptible swell of everything Ember-lit; §1 said "post-Gate" but the Review Board judged it atmosphere, not content — Ian may veto · BUILT (Gate 0 iter 4)
 - 2026-07-12 · Keeper-lights keep their own time (Law 6 corollary) · PASS · all scenes · the Dreamer's red breathes; a keeper's window/firefly holds steady — two kinds of light, never synced · CANON + BUILT
 - 2026-07-12 · Ash-petals off the Ember (weather, §4 Ch1 already canon) · PASS · S1 · dark flecks falling in the disc's column, visible only against its light; slow (Law 5) · BUILT (Gate 0 iter 4)
+- 2026-07-12 · GATE 0 CLOSED · IAN'S DIRECT ORDER · all scenes · "no i want u to build the full game" — the atmosphere-benchmark loop ends, full v1 build begins per BRIEF §7.9 · FULL BUILD
