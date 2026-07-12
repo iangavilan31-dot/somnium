@@ -1,5 +1,29 @@
 # ART DIRECTION LAW — Ian's Gate 0 directive (2026-07-12)
 
+## VISUAL BENCHMARK (Ian's board, 2026-07-12 — the level to hit)
+Ian supplied a benchmark board ("VISUAL TARGET / BENCHMARK"). Key elements: massive
+celestial body dominating the frame · layered depth (foreground → midground →
+background → sky) · painterly lighting with soft atmospheric scattering · ancient,
+decayed, lived-in world · insignificant player · subtle motion everywhere · rich
+detail WITHOUT clutter. Mood: lonely, mysterious, ancient, melancholic, ominous,
+beautiful. "This is not a 3D game look. This is a painted world you can move
+through." "When a player stops moving, the game should still look like a masterpiece."
+
+**Gap analysis vs current build (priority order):**
+1. **SKY/CLOUD DRAMA** — benchmark sky is FULL of massive cloud masses swirling
+   around/behind the disc, under-lit red at their edges, silhouetted wisps crossing
+   the face. Ours is mostly empty black with thin streaks. Biggest gap by far.
+2. **FIELD DENSITY** — benchmark field is rich: daisies with readable petals
+   scattered everywhere, thorny dead vegetation, twisted branches, stones, warm
+   dusty color variation (greens/browns/red hints). Ours is still sparse/dark.
+3. **LAYERED MOUNTAIN SCATTERING** — each distance layer separated by glowing haze
+   (atmospheric perspective), not hard black-on-black stacking; a ruined tower on a
+   hill with faint warm lights reads at midground.
+4. **THORN TREE FRAMING** — a big gnarled dead tree with red-lit thorns frames the
+   left edge of the hero shot.
+5. Foreground macro detail (log, thorns, flower clusters very close, soft-focus feel).
+
+
 **NO enemies. NO mechanics. NO quests. NO UI. NO progression. NO systems.**
 One biome only — the **Red-Sun Field** — polished until it is the visual benchmark
 for the whole game. It gates everything.
