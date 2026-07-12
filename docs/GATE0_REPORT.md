@@ -30,7 +30,7 @@ Budget headroom is enormous; 60fps bar cleared ~2.7× at the display's refresh c
 
 ## Honest self-assessment (not a substitute for Ian's grade)
 - Strongest: wake-up sequence composition (still 02 belongs in the slide deck), walk cycle weight, cloak physics after the gravity fix.
-- Weakest: attack anticipation silhouette partially overlaps the helm at one frame; far-limb depth could read better in the darkest scenes; knight is rig-drawn shapes, not hand-painted frames — the painted-frame upgrade path exists if Ian wants it.
+- Weakest: the knight is still a rig drawn in code (now with painted plate bands, brush strokes, chainmail speckle, tabard folds) — if the bar is true hand-painted Osprey-plate frames, that's the named upgrade path for after the grade.
 - Gamepad path untested against real hardware (Playwright drives keyboard only — real key events, no dispatchEvent).
 
 ## Iteration log (what the two QA passes caught by LOOKING)
@@ -40,3 +40,7 @@ Budget headroom is enormous; 60fps bar cleared ~2.7× at the display's refresh c
 4. Grain invisible at 0.16 overlay — raised to 0.26; the aged-print look now carries.
 5. Every limb rim-lit = wireframe look — rims rebalanced (far limbs ~0.13, helm/torso lead).
 6. Camera too far to grade animation — gameplay zoom 1.18 → 1.38.
+7. (pass 3) Knight read as flat rig shapes — added painted armor texture: plate
+   separation bands, axial brush strokes, chainmail speckle, tabard fold shadows.
+8. (pass 3) Attack anticipation blade overlapped the helm — windup re-posed
+   (arm higher/deeper behind, blade angle flattened); silhouette now clean.

@@ -64,8 +64,8 @@ const WAKE: Key[] = [
 
 const ATTACK: Key[] = [
   { t: 0.0, pose: IDLE, ease: easeInOutCubic },
-  { t: 0.30, pose: P({ pelvisX: -9, pelvisY: 68, torso: -13, head: 3, shR: -128, elR: 55, sword: -25, shL: 30, elL: 26, hipL: 15, shinL: -4, hipR: -19, shinR: -24 }), ease: easeInOutCubic },
-  { t: 0.34, pose: P({ pelvisX: -8, pelvisY: 68, torso: -11, head: 3, shR: -120, elR: 48, sword: -22, shL: 28, elL: 26, hipL: 15, shinL: -4, hipR: -19, shinR: -24 }), ease: easeInCubic },
+  { t: 0.30, pose: P({ pelvisX: -9, pelvisY: 68, torso: -16, head: 6, shR: -138, elR: 62, sword: -12, shL: 30, elL: 26, hipL: 15, shinL: -4, hipR: -19, shinR: -24 }), ease: easeInOutCubic },
+  { t: 0.34, pose: P({ pelvisX: -8, pelvisY: 68, torso: -14, head: 5, shR: -130, elR: 54, sword: -12, shL: 28, elL: 26, hipL: 15, shinL: -4, hipR: -19, shinR: -24 }), ease: easeInCubic },
   { t: 0.43, pose: P({ pelvisX: 14, pelvisY: 70, torso: 21, head: -2, shR: 66, elR: 6, sword: 14, shL: -20, elL: 32, hipL: 24, shinL: 2, hipR: -26, shinR: -30 }), ease: easeInCubic },
   { t: 0.60, pose: P({ pelvisX: 10, pelvisY: 71, torso: 15, head: -1, shR: 50, elR: 15, sword: 26, shL: -14, elL: 26, hipL: 18, shinL: 0, hipR: -20, shinR: -24 }), ease: easeOutCubic },
   { t: 0.88, pose: IDLE, ease: easeInOutCubic },
@@ -103,6 +103,15 @@ function legIK(hipX: number, hipY: number, footX: number, footY: number): [numbe
   const shin = Math.atan2(footX - kx, footY - ky);
   return [hip, shin];
 }
+
+// stable pseudo-random per-limb variation (indexed by draw order)
+const LIMB_JIT = [0.3, -0.2, 0.45, -0.4, 0.1, -0.15, 0.5, -0.35, 0.2, -0.05, 0.4, -0.25];
+// chainmail speckle positions in torso frame: [along 0..1, across -1..1]
+const SPECKLE: [number, number][] = [
+  [0.12, -0.5], [0.18, 0.3], [0.25, -0.1], [0.3, 0.6], [0.34, -0.7], [0.4, 0.15],
+  [0.46, -0.35], [0.5, 0.5], [0.55, -0.6], [0.6, 0.05], [0.64, 0.65], [0.7, -0.25],
+  [0.74, 0.35], [0.8, -0.55], [0.84, 0.1], [0.88, 0.55], [0.2, -0.8], [0.66, -0.8],
+];
 
 // ---- cloak (verlet chain) ----
 const CLOAK_N = 7, CLOAK_LINK = 12.5;
@@ -344,6 +353,7 @@ export class Knight {
   // ---- painted render ----
   draw(ctx: CanvasRenderingContext2D) {
     const p = this.compute();
+    this.limbIdx = 0; // stable per-limb variation each frame
     ctx.save();
     ctx.translate(this.x, GROUND_Y);
     ctx.scale(this.facing, 1);
@@ -413,6 +423,7 @@ export class Knight {
     return this.state === "attack" && this.stateT > 0.31 && this.stateT < 0.52;
   }
 
+  private limbIdx = 0;
   private limb(
     ctx: CanvasRenderingContext2D,
     a: [number, number], b: [number, number],
@@ -421,6 +432,8 @@ export class Knight {
     const dx = b[0] - a[0], dy = b[1] - a[1];
     const d = Math.hypot(dx, dy) || 1;
     const nx = -dy / d, ny = dx / d;
+    const ux = dx / d, uy = dy / d;
+    const jit = LIMB_JIT[this.limbIdx++ % LIMB_JIT.length]; // stable per draw order
     ctx.fillStyle = color;
     ctx.beginPath();
     ctx.moveTo(a[0] + nx * w1, a[1] + ny * w1);
@@ -432,15 +445,35 @@ export class Knight {
     // joints read as armor plates
     ctx.beginPath(); ctx.arc(a[0], a[1], w1 * 1.05, 0, TAU); ctx.fill();
     ctx.beginPath(); ctx.arc(b[0], b[1], w2 * 1.05, 0, TAU); ctx.fill();
+    // painted form: plate separation bands across the limb
+    ctx.strokeStyle = "#06060a";
+    ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 1.4;
+    for (const bu of [0.3 + jit * 0.1, 0.68 + jit * 0.08]) {
+      const px = a[0] + ux * d * bu, py = a[1] + uy * d * bu;
+      const w = lerp(w1, w2, bu) * 0.92;
+      ctx.beginPath();
+      ctx.moveTo(px + nx * w, py + ny * w);
+      ctx.lineTo(px - nx * w, py - ny * w);
+      ctx.stroke();
+    }
+    // axial brush stroke — a soft mid-tone catch inside the upper edge
+    ctx.strokeStyle = "#232330";
+    ctx.globalAlpha = 0.4;
+    ctx.lineWidth = 1.6;
+    const side0 = ny < 0 ? 1 : -1;
+    ctx.beginPath();
+    ctx.moveTo(a[0] + nx * w1 * 0.55 * side0 + ux * d * 0.12, a[1] + ny * w1 * 0.55 * side0 + uy * d * 0.12);
+    ctx.lineTo(a[0] + nx * w2 * 0.5 * side0 + ux * d * 0.62, a[1] + ny * w2 * 0.5 * side0 + uy * d * 0.62);
+    ctx.stroke();
     // red rim on the upper edge (sun side)
-    const side = ny < 0 ? 1 : -1;
     ctx.strokeStyle = rim;
     ctx.globalAlpha = rimAlpha;
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
     ctx.beginPath();
-    ctx.moveTo(a[0] + nx * w1 * side, a[1] + ny * w1 * side);
-    ctx.lineTo(b[0] + nx * w2 * side, b[1] + ny * w2 * side);
+    ctx.moveTo(a[0] + nx * w1 * side0, a[1] + ny * w1 * side0);
+    ctx.lineTo(b[0] + nx * w2 * side0, b[1] + ny * w2 * side0);
     ctx.stroke();
     ctx.globalAlpha = 1;
   }
@@ -464,6 +497,18 @@ export class Knight {
     ctx.fill();
     // pauldron hump
     ctx.beginPath(); ctx.arc(neck[0], neck[1] + 4, 11, 0, TAU); ctx.fill();
+    // chainmail speckle — painted texture, stable positions in torso frame
+    ctx.fillStyle = "#1d1d26";
+    ctx.globalAlpha = 0.5;
+    for (const [su, sv] of SPECKLE) {
+      const w = lerp(9.5, 13, su) * 0.8;
+      const px = pel[0] + (neck[0] - pel[0]) * su + nx * sv * w;
+      const py = pel[1] + (neck[1] - pel[1]) * su + ny * sv * w;
+      ctx.beginPath();
+      ctx.arc(px, py, 1.1, 0, TAU);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
     // tabard skirt — the ONLY colored cloth: deep dried-blood red
     ctx.fillStyle = "#2a100d";
     ctx.beginPath();
@@ -473,6 +518,17 @@ export class Knight {
     ctx.lineTo(pel[0] + nx * 11 + 2, pel[1] + 20);
     ctx.closePath();
     ctx.fill();
+    // tabard fold shadows
+    ctx.strokeStyle = "#170a08";
+    ctx.globalAlpha = 0.6;
+    ctx.lineWidth = 1.5;
+    for (const fv of [-0.35, 0.3]) {
+      ctx.beginPath();
+      ctx.moveTo(pel[0] + nx * 9 * fv, pel[1] + ny * 9 * fv);
+      ctx.lineTo(pel[0] + nx * 11 * fv + 2, pel[1] + 19);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
     // chest rim light
     ctx.strokeStyle = rim;
     ctx.globalAlpha = rimAlpha;
