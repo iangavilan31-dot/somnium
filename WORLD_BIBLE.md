@@ -256,11 +256,29 @@ The lullaby resolves — the only resolved cadence in the entire game (§11). Cu
 
 ---
 
-## §5 · THE MINOTAUR — "the first awake" (v1 finale, BRIEF-locked silhouette)
+## §5 · BOSSES
+
+**THE BOSS LAW (v1.1, Ian's Law of Stillness — binds every boss, present and future):**
+Bosses are not evil. They are ancient beings that have been disturbed. Every boss
+encounter obeys five beats:
+1. **Peace first** — the boss is met at rest; the arena is a place before it is a fight.
+2. **The threshold** — combat begins only when the players *choose* to cross a visible
+   line (step onto the buried bell floor; take the offered thing; break the quiet).
+   The world never forces the fight.
+3. **Reluctance** — the boss's first phase warns; aggression is its last resort.
+4. **The fight mourns itself** — no triumph music, no health bar; its grief shows.
+5. **Defeat = the world grows QUIETER** — fog clears, birds return, wind changes,
+   kept lights answer. The players restored balance; they conquered nothing.
+Boss seeds that cannot obey all five (§ below) stay parked.
+
+### THE MINOTAUR — "the first awake" (v1 finale, BRIEF-locked silhouette)
 
 *Locked by BRIEF/slide: huge red-furred minotaur with a greatsword, black tower, tiny
 knights below, blue-white snow, 60%+ screen height, 2–3 phases, ground shockwaves.
-The bible's job: make that exact image inevitable in THIS world.*
+The bible's job: make that exact image inevitable in THIS world. Boss Law compliance:
+peace (met kneeling, snow-drifted) · threshold (the players' own footsteps tolling the
+buried floor) · reluctance (palm-down:* quiet, stay*) · mourning (Phase 3 restraint) ·
+quieter world (snow settles, votive lights, the mute bell).*
 
 - **Origin:** four hundred years ago the first wake-scar opened in a belfry town. One
   keeper woke and could not re-sleep. Wakefulness grows in a dreamed world: the dream

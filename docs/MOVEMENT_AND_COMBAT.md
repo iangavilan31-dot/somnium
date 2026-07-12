@@ -1,5 +1,7 @@
 # SOMNIUM — MOVEMENT & COMBAT BIBLE
-**The feel canon. · v1.0 · 2026-07-12 · sits under WORLD_BIBLE.md, peer to ART_DIRECTION.md**
+**The feel canon. · v1.1 · 2026-07-12 · sits under WORLD_BIBLE.md, peer to ART_DIRECTION.md**
+*(v1.1 amendment: Ian's LAW OF STILLNESS chapter — the named root law, the Painter's
+Camera, the ringing blade, attention-is-noise co-op, parry refinements, the Boss Law.)*
 
 > **Hierarchy:** `BRIEF.md` (scope — supreme) → `WORLD_BIBLE.md` (meaning) →
 > { `docs/ART_DIRECTION.md` (how a frame looks) · **this doc** (how the knights feel) }.
@@ -18,14 +20,21 @@
 2. **SILHOUETTE** — readable as a black shape at gameplay zoom, every key frame.
 3. **PAINT** — does it read as brushwork in motion (painted smears, held poses), never digital tweening?
 4. **QUIET** — what sound does it deserve? Does it respect Law 8 (the mix whispers so one toll can matter)?
-5. **LAW** — does the verb serve a trained knight on a kept journey — not an arcade acrobat?
+5. **LAW** — did THIS world demand it, or did another game donate it? Five sub-tests
+   (Ian's ONE LAW): does it deepen the feeling of a silent painted world · preserve
+   atmosphere · reinforce weight · create memorable composition · encourage wonder?
+   Any "no" and it does not belong — even if every successful game has it.
 6. **CLIP** — would someone clip it with zero UI and no damage numbers?
 7. **CO-OP** — what does it look like when both knights do it together, or near each other?
 8. **SCOPE** — which BRIEF phase? Cancel windows defined? Perf note (pooled particles, no shadowBlur, no per-pixel loops)?
 
 ---
 
-## §1 · MOVEMENT PHILOSOPHY
+## §1 · THE LAW OF STILLNESS (movement philosophy — the root law, named by Ian)
+
+**The world existed in quiet for centuries. Only the knights make noise.
+The player is not merely moving through the world — they are disturbing it.
+Combat is not aggression; it is restoring silence.**
 
 **The knights are the loudest things in this world.**
 
@@ -46,7 +55,30 @@ can only be *careful*. This single fact generates the whole movement identity:
 
 ---
 
-## §2 · THE VERB SET
+## §1.5 · THE PAINTER'S CAMERA (the camera composes; it does not follow)
+
+The camera's job is to keep every frame a painting while never fighting the player's
+hands. In 2.5D terms:
+
+- **Composition anchors, authored per scene region:** each stretch of world defines its
+  intended painting — horizon height, where the accent subject sits (the Ember at the
+  upper third, the tower at the right edge), which framing elements must stay in frame
+  (the thorn sentinel at the west of Scene 1). The camera target is a weighted blend of
+  the knights' midpoint and the local anchor field — the players move freely INSIDE the
+  composition; the composition itself is protected and yields reluctantly.
+- **The repose:** when both knights stand still ~4 seconds, the camera eases (2–3s)
+  into the region's authored composition and holds — ambient drift continues, fireflies
+  wander, the cloak settles. *Every pause looks like concept art* — by design, not by
+  luck. Any input breaks it instantly; the camera never takes control, it accepts it.
+- **Drift, never track:** damped follow with the existing leash (built); no snaps, no
+  cuts during traversal; push-ins remain rationed (Berserk law — two per boss).
+- **Verticality:** the Gothic Stair's anchors rotate the thirds vertically; climbing
+  frames the knights small against the full height of what they're climbing (Law 2).
+- **Co-op framing:** the leash frames both knights; when they split (the split climb),
+  the camera widens to hold both — separation reads as one painting of two figures,
+  the Rückenfigur doubled (Friedrich law).
+- **Perf note:** this is camera math, not rendering — zero frame cost. Anchors are
+  data authored per scene alongside the plates.
 
 ### Core verbs (v1 — BRIEF §7.5 locked set + two flagged additions)
 | Verb | Weight spec / feel | Co-op shade | Home |
@@ -200,9 +232,11 @@ the mountain). It is deliberate — Uncharted's readable reach-grab, none of its
 - **Animation style:** anticipation → acceleration → impact → follow-through → recovery
   on every swing (§10 table); painted smear on the strike frames (existing tech);
   held poses at combo ends (paperback cover frames mid-fight).
-- **Sound profile:** steel choir, low — whoosh is cloth+air, impact is dull bronze-on-
-  ink, never "video-game shing." The blade is loud in a world that isn't; the mix
-  makes each swing feel like breaking a rule.
+- **Sound profile:** **in a world where every bell is bound, each sword strike is a
+  small unlawful bell.** Strikes RING — one lonely tone with a long valley-reverb tail
+  that the mix gives room to die (Law 8: the mix whispers so one ring can matter).
+  Whoosh is cloth and air; there is no arcade "shing," there is a toll in miniature.
+  Every swing rings through forgotten valleys — which is also *why the Stirred come.*
 - **VFX:** smear trails (exist), directional painted sparks on glance, ink-splash on
   tear. No glow, no elemental coatings.
 - **Unique mechanic:** the Hush-parry (§11) and toll-sync (§14) are the blade's magic.
@@ -242,9 +276,12 @@ the mountain). It is deliberate — Uncharted's readable reach-grab, none of its
 
 Strict-timing deflect (8f window) with the most SOMNIUM payoff possible:
 
-- On success **the game holds its breath**: 300ms of near-total silence, ambient ducked,
-  the attacker's ink stalling mid-stroke — the held-breath made mechanical (§9 world
-  canon). Then the riposte window.
+- On success **the game holds its breath**: 300ms of near-total silence — ambient and
+  music recede, the attacker's ink stalls mid-stroke, **and every ambient particle
+  stops**: petals hang, motes freeze, embers pause mid-rise (one flag on the FX update;
+  free). Through that stillness, **one pure ring** — the parry is the only sound in the
+  world. Then the riposte window. Parrying is not "perfect timing"; it is restoring
+  order, and the world acknowledges mastery.
 - Visual: no spark flash — a *smothering*: the strike is caught in the cloak-wrapped
   forearm and QUIETED, painted motion collapsing to stillness.
 - **Dual parry:** both knights parry the same beat → the full held breath — one full
@@ -263,8 +300,12 @@ Locked juice stack (BRIEF §7.7) + additions, all painterly-restrained:
 - **pad rumble:** hits, heavy landings — and **the distant toll thrums the pad softly
   from Scene 1 onward**, growing chapter by chapter until the S5 fight plays the
   players' hands like the buried bell floor. (DualSense path; degrade gracefully.)
-- dynamic sound layering: whoosh (cloth) + impact (bronze/ink) + world answer (the
+- dynamic sound layering: whoosh (cloth) + the ring (§9) + world answer (the
   two-second held breath after the last enemy hushes — canon §9).
+- **the strongest impacts are the quietest details** (Ian's restraint law): a slight
+  pause · steel ringing · dust lifting · a cape settling · **a raven taking flight** —
+  the heaviest blows are punctuated by a bird leaving the nearest silhouette, not by a
+  bigger flash. No floating numbers, no anime flashes, no screen-filling effects, ever.
 
 ## §13 · ENEMY REACTIONS (the painted damage language)
 
@@ -281,8 +322,22 @@ Locked juice stack (BRIEF §7.7) + additions, all painterly-restrained:
   look like putting something to rest. **Joint quieting:** large Stirred need both
   knights holding it down — the co-op execution is a shared vow, not a gore shot.
 
-## §14 · CO-OP COMBAT (teamwork, not doubled damage)
+## §14 · CO-OP COMBAT (two guardians, not two heroes)
 
+- **ATTENTION IS NOISE (the unification):** the Stirred are drawn to sound, and the
+  knights are the loudest things alive — so the aggro system IS the noise system.
+  Every action carries a loudness (walk < wade < sprint < roll < strike < ring); each
+  Stirred attends to the knight who rang loudest most recently. From this one rule,
+  formations emerge with zero UI: **one draws** (be loud), **one protects** (stand
+  between), **one interrupts** (parry/kick), **one finishes** (the quieting). The game
+  rewards awareness over aggression because awareness is literally quieter.
+- **The Ring (diegetic taunt):** a knight strikes their blade against stone — one
+  deliberate unlawful bell-toll. Every Stirred in earshot turns. Uses the existing
+  glance-off-stone tech; costs a recovery window (taunting is a commitment).
+- **De-escalation:** Stirred that lose attention drift back toward settling — disengage,
+  go quiet, and some fights can be walked away from before they finish waking. Fights
+  are accidents of noise; some accidents can be un-had. (Authored per encounter,
+  Phase 2 intent.)
 - **Toll-sync:** strikes that land together land true — both knights hitting one target
   within the same beat window bonus-stagger it. Near the S5 arena the world's toll IS
   the beat; players who sync to it fight in rhythm with the world. Ambient, optional,

@@ -38,3 +38,9 @@ _Format: date · element (type) · gate verdict · scene/hue · one-line law-fit
 - 2026-07-12 · Kept-thing rites (magic system) · PASS · TBD · uncorking preserved moments; no projectiles, no mana · POST-V1, RE-GATE PER RITE
 - 2026-07-12 · Taking up the watch (clapper as NG+ weapon) · SEED · S5 · the price: the Great Bell hangs unguarded · POST-V1, RE-GATE
 - 2026-07-12 · Movement/combat kills: swimming, ziplines, sidestep, 14-weapon arsenal, shields, staff/tome magic, boss-climbing, stamina bar, sync prompts · KILLED · — · see MOVEMENT_AND_COMBAT §17 · KILL-LOG
+- 2026-07-12 · THE LAW OF STILLNESS (root law, named by Ian) · PASS · all · violence disturbs an ancient silence; combat = restoring it · CANON v1.1 (M&C §1)
+- 2026-07-12 · The Painter's Camera (system) · PASS · all scenes · composition anchors + the repose: every pause looks like concept art · PHASE 1 BUILD (M&C §1.5)
+- 2026-07-12 · The blade rings like an unbound bell (sound identity) · PASS · combat · every strike = a small unlawful bell; why the Stirred come · PHASE 2/4 BUILD (M&C §9)
+- 2026-07-12 · Attention is noise (aggro unification) + the Ring taunt + de-escalation · PASS · combat · formations emerge from loudness; awareness rewarded because it is quieter · PHASE 2 BUILD (M&C §14)
+- 2026-07-12 · Parry refinement: particles stall + one pure ring through the silence · PASS · combat · the world acknowledges mastery · PHASE 2 BUILD (M&C §11)
+- 2026-07-12 · THE BOSS LAW (five beats: peace/threshold/reluctance/mourning/quieter world) · PASS · all bosses · binds First Awake (already compliant) + all seeds · CANON (WORLD_BIBLE §5)
