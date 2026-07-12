@@ -65,14 +65,26 @@ export class Fx {
     this.smears.length = 0;
     this.birds.length = 0;
     this.moths.length = 0;
+    this.bats.length = 0;
     if (id === 3) {
       // the Moth Warden's street lamp (scene3.ts S3_LAMP) — her moths never leave it
       for (let i = 0; i < 6; i++) {
         this.moths.push({ x: 1982, y: 872, bx: 1982, by: 872, ph: this.R() * TAU, ph2: this.R() * TAU });
       }
     }
+    if (id === 4) {
+      // stair-bats riding the updraft — staging only in Phase 1 (enemies are Phase 2)
+      for (let i = 0; i < 7; i++) {
+        this.bats.push({
+          x: this.R() * WORLD_W, y: 480 + this.R() * 420,
+          vx: (this.R() < 0.5 ? -1 : 1) * (16 + this.R() * 14),
+          flap: this.R() * TAU, size: 3.5 + this.R() * 2.5,
+        });
+      }
+    }
   }
   private moths: Firefly[] = [];
+  private bats: Bird[] = [];
 
   dust(x: number, y: number, n: number, dir: number) {
     for (let i = 0; i < n; i++) {
@@ -127,6 +139,16 @@ export class Fx {
       if (p.age >= p.life) { this.petals.splice(i, 1); continue; }
       p.x += (p.vx + Math.sin(p.age * 1.6 + p.sway) * 10) * dt;
       p.y += (p.vy + Math.sin(p.age * 2.3 + p.sway) * 4) * dt;
+    }
+    // stair-bats — riding the updraft in slow rising weaves; reset below when they
+    // clear the band (the chasm exhales them forever)
+    for (const b of this.bats) {
+      b.flap += dt * 13;
+      b.x += (b.vx + Math.sin(b.flap * 0.31) * 22) * dt;
+      b.y -= (10 + Math.sin(b.flap * 0.17) * 7) * dt;
+      if (b.x < -60) b.x = WORLD_W + 50;
+      if (b.x > WORLD_W + 60) b.x = -50;
+      if (b.y < 360) { b.y = 900 + this.R() * 80; b.x = this.R() * WORLD_W; }
     }
     // lamp-moths — slow orbits around the Warden's light, wobbling on paper wings
     for (const m of this.moths) {
@@ -279,6 +301,17 @@ export class Fx {
       ctx.beginPath();
       ctx.ellipse(p.x, p.y, p.size, p.size * 0.6, Math.sin(p.age * 2 + p.sway) * 0.8, 0, TAU);
       ctx.fill();
+    }
+    // stair-bats — jittery double-stroke wings, dark against the magenta band
+    ctx.strokeStyle = "#0a0508";
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = "round";
+    for (const b of this.bats) {
+      const w = Math.sin(b.flap) * 0.8;
+      ctx.beginPath();
+      ctx.moveTo(b.x - b.size, b.y - w * b.size * 0.9);
+      ctx.quadraticCurveTo(b.x, b.y + b.size * 0.3, b.x + b.size, b.y - w * b.size * 0.9);
+      ctx.stroke();
     }
     // lamp-moths — pale wings that only exist where the lamp's light reaches
     for (const m of this.moths) {

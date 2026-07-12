@@ -63,6 +63,19 @@ await ev("window.__somnium.walk(0)");
 await sleep(800);
 await still("r3-street");
 
+// ---- SCENE 4 ----
+await ev("window.__somnium.skipToScene(4)");
+await sleep(2400);
+await waitIdle();
+await sleep(900);
+await still("r4-spawn");
+await ev("window.__somnium.walk(1)");
+t0 = Date.now();
+while (Date.now() - t0 < 16000 && (await ev("window.__somnium.x()")) < 1300) await sleep(180);
+await ev("window.__somnium.walk(0)");
+await sleep(700);
+await still("r4-mid");
+
 const perf = await ev("window.__perf");
 console.log("perf:", JSON.stringify(perf));
 await browser.close();

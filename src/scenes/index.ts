@@ -5,6 +5,8 @@
 import { registerScene } from "../journey";
 import { SCENE2 } from "./scene2";
 import { SCENE3 } from "./scene3";
+import { SCENE4 } from "./scene4";
 
 registerScene(SCENE2);
 registerScene(SCENE3);
+registerScene(SCENE4);
