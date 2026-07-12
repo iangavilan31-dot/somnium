@@ -23,7 +23,8 @@ function keptWindow(
   ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number,
   glow: number, sleeper: boolean,
 ) {
-  dab(ctx, x, y, w * 1.9, h * 1.7, 0, "#7a3a14", 0.14 * glow); // halo breath
+  // halo only at vista scale — on a close wall it reads as a porthole disc (board-killed)
+  if (w < 10) dab(ctx, x, y, w * 1.9, h * 1.7, 0, "#7a3a14", 0.14 * glow);
   ctx.fillStyle = "#e8964a";
   ctx.globalAlpha = 0.92 * glow;
   ctx.beginPath();
@@ -118,7 +119,8 @@ function s3Hills(): Layer {
 function s3Town(): Layer {
   const [c, ctx] = makeCanvas(500, 980);
   const R = mulberry32(331);
-  const HX = 1720, HB = 866; // hill crest
+  const HX = 1500, HB = 806; // hill crest — high and west enough to OWN the horizon
+                             // from spawn (iter 3: at 866 the fields buried it)
   // the town's warmth first — a bowl of lamp-fed air the hill silhouettes against
   for (let i = 0; i < 70; i++) {
     const ox = (R() + R() - 1) * 0.5 * 640;
@@ -126,7 +128,7 @@ function s3Town(): Layer {
       R() < 0.6 ? "#5a3416" : "#6e4018", 0.12);
   }
   // the hill the town sleeps on — readable against its own glow
-  ctx.fillStyle = "#0e1830";
+  ctx.fillStyle = "#0c1426";
   ctx.beginPath();
   ctx.moveTo(HX - 560, PLATE_H);
   ctx.quadraticCurveTo(HX - 420, HB + 30, HX - 190, HB - 26);
@@ -208,12 +210,13 @@ function s3Town(): Layer {
   ctx.quadraticCurveTo(KX - 2, KB - 71.5, KX + 9, KB - 63);
   ctx.stroke();
   ctx.globalAlpha = 1;
-  // the windows — every one a kept promise (doubled; the constellation must READ)
-  for (let i = 0; i < 40; i++) {
+  // the windows — every one a kept promise; they must cut THROUGH the glow bowl,
+  // hot and readable: the constellation IS the vista (final size bump, board-timed)
+  for (let i = 0; i < 52; i++) {
     const [hx, hy, s] = spots[i % spots.length];
-    const wx = hx + (R() - 0.5) * 16 * s, wy = hy - (4 + R() * 10) * s;
-    dab(ctx, wx, wy, 1.5 + R() * 0.6, 1.9 + R() * 0.6, 0, "#f6b060", 0.9);
-    dab(ctx, wx, wy, 4, 4.8, 0, "#8a4218", 0.25);
+    const wx = hx + (R() - 0.5) * 16 * s, wy = hy - (2 + R() * 8) * s;
+    dab(ctx, wx, wy, 2.8 + R() * 1.1, 3.6 + R() * 1.1, 0, "#ffc070", 1.0);
+    dab(ctx, wx, wy, 6.5, 7.8, 0, "#a04e1c", 0.32);
   }
   // roosting ravens on two rooflines — sound-eaters, off duty
   ctx.fillStyle = "#050810";
@@ -259,6 +262,48 @@ function s3Fields(): Layer {
     dab(ctx, x, s3MidY(x) + 2 - R() * 6, 5 + R() * 12, 6 + R() * 12, 0, "#060c16", 0.9);
   }
   return { canvas: c, parallax: 0.45, yOff: 760 };
+}
+
+// the second rank — rooflines behind the street, one lane deeper into the town.
+// Between the front houses you see more kept windows, not empty night: fabric.
+function s3StreetBack(): Layer {
+  const [c, ctx] = makeCanvas(560, 1050);
+  const R = mulberry32(343);
+  const hood = (hx: number, hb: number, s: number, nWin: number) => {
+    ctx.fillStyle = "#0b1320";
+    ctx.beginPath();
+    ctx.moveTo(hx - 34 * s, hb);
+    ctx.lineTo(hx - 32 * s, hb - 40 * s);
+    ctx.quadraticCurveTo(hx - 28 * s, hb - 58 * s, hx - 2 * s, hb - 60 * s);
+    ctx.quadraticCurveTo(hx + 24 * s, hb - 58 * s, hx + 30 * s, hb - 42 * s);
+    ctx.lineTo(hx + 33 * s, hb);
+    ctx.closePath();
+    ctx.fill();
+    dab(ctx, hx - 4 * s, hb - 56 * s, 26 * s, 2 * s, 0.05, "#32436a", 0.22); // moon rim
+    for (let i = 0; i < nWin; i++) {
+      const wx = hx - 14 * s + i * 18 * s + (R() - 0.5) * 6;
+      const wy = hb - (18 + R() * 16) * s;
+      dab(ctx, wx, wy, 3.2, 4, 0, "#e8a054", 0.7);
+      dab(ctx, wx, wy, 7.5, 9, 0, "#8a4218", 0.18);
+    }
+  };
+  hood(1590, 940, 1.7, 1);
+  hood(1830, 952, 1.9, 2);
+  hood(2040, 946, 1.6, 1);
+  hood(2260, 955, 2.0, 2);
+  // a lamp-loft tower rising behind the Warden's quarter
+  ctx.fillStyle = "#0b1320";
+  ctx.beginPath();
+  ctx.moveTo(2150, 930);
+  ctx.lineTo(2156, 812);
+  ctx.quadraticCurveTo(2162, 796, 2174, 795);
+  ctx.quadraticCurveTo(2186, 796, 2190, 810);
+  ctx.lineTo(2198, 930);
+  ctx.closePath();
+  ctx.fill();
+  dab(ctx, 2173, 806, 8, 9, 0, "#e8a054", 0.55); // the horn-paper crown
+  dab(ctx, 2173, 806, 18, 20, 0, "#7a3a14", 0.16);
+  return { canvas: c, parallax: 0.82, yOff: 560 };
 }
 
 const s3GroundTop = (x: number) =>
@@ -314,67 +359,163 @@ function s3Ground(): Layer {
 
   // THE STREET (east half) — house fronts at walking depth, windows kept warm.
   // Thresholds swept. Two windows frame their sleepers. This is somebody's promise.
-  const houseFront = (hx: number, s: number, sleeper: boolean, daisies: boolean) => {
-    const hb = 985;
-    ctx.fillStyle = "#0a121e";
-    ctx.beginPath(); // hooded front: wall + deep curled eave
-    ctx.moveTo(hx - 46 * s, hb);
-    ctx.lineTo(hx - 44 * s, hb - 64 * s);
-    ctx.quadraticCurveTo(hx - 40 * s, hb - 92 * s, hx - 6 * s, hb - 96 * s);
-    ctx.quadraticCurveTo(hx + 34 * s, hb - 94 * s, hx + 42 * s, hb - 66 * s);
-    ctx.lineTo(hx + 44 * s, hb);
+  // (Iteration 3: the pod-row died at the board — real roofs with weight, timber,
+  // staggered baselines, garden walls closing the gaps, light spilling on the ground.)
+  const houseFront = (hx: number, hb: number, s: number, sleeper: boolean, daisies: boolean) => {
+    const wallW = 40 * s, wallH = 60 * s;
+    // wall — plaster over a stone footing
+    ctx.fillStyle = "#0b131e";
+    ctx.beginPath();
+    ctx.moveTo(hx - wallW, hb);
+    ctx.lineTo(hx - wallW + 2 * s, hb - wallH);
+    ctx.lineTo(hx + wallW - 2 * s, hb - wallH);
+    ctx.lineTo(hx + wallW, hb);
     ctx.closePath();
     ctx.fill();
-    // eave shadow band
-    dab(ctx, hx, hb - 78 * s, 44 * s, 7 * s, 0.02, "#050a12", 0.8);
-    // the kept window
-    keptWindow(ctx, hx - 4 * s, hb - 44 * s, 16 * s, 20 * s, 1, sleeper);
+    // plaster wear — the wall is a surface, not a panel
+    for (let i = 0; i < 14; i++) {
+      dab(ctx, hx + (R() - 0.5) * wallW * 1.7, hb - 14 * s - R() * (wallH - 18 * s),
+        4 * s * R() + 2, 2.5 * s * R() + 1.5, R() * TAU,
+        R() < 0.5 ? "#0a111b" : "#0d1622", 0.5);
+    }
+    ctx.fillStyle = "#0a1119"; // stone footing band
+    ctx.beginPath();
+    ctx.moveTo(hx - wallW, hb);
+    ctx.lineTo(hx - wallW + 0.8 * s, hb - 12 * s);
+    ctx.lineTo(hx + wallW - 0.8 * s, hb - 12 * s);
+    ctx.lineTo(hx + wallW, hb);
+    ctx.closePath();
+    ctx.fill();
+    // timber bones — dark posts the plaster grew old around
+    ctx.strokeStyle = "#070d16";
+    ctx.lineWidth = 2.6 * s * 0.5;
+    for (const tx of [-0.62, 0.05, 0.66]) {
+      ctx.beginPath();
+      ctx.moveTo(hx + wallW * tx, hb - 11 * s);
+      ctx.lineTo(hx + wallW * tx + 1.5 * s, hb - wallH + 2 * s);
+      ctx.stroke();
+    }
+    // THE ROOF — seated ON the wall (the mushroom-cap float was board-killed):
+    // low pitch, modest eaves, bottom edge overlapping the wall top by a full course
+    ctx.fillStyle = "#080e18";
+    ctx.beginPath();
+    ctx.moveTo(hx - wallW - 4.5 * s, hb - wallH + 3.5 * s);
+    ctx.quadraticCurveTo(hx - wallW + 6 * s, hb - wallH - 13 * s, hx - 4 * s, hb - wallH - 17 * s);
+    ctx.quadraticCurveTo(hx + 22 * s, hb - wallH - 17.5 * s, hx + wallW - 2 * s, hb - wallH - 8 * s);
+    ctx.quadraticCurveTo(hx + wallW + 5 * s, hb - wallH - 3 * s, hx + wallW + 4.5 * s, hb - wallH + 3.5 * s);
+    ctx.closePath();
+    ctx.fill();
+    // thatch course lines sagging with age
+    ctx.strokeStyle = "#060b13";
+    ctx.globalAlpha = 0.8;
+    ctx.lineWidth = 1.3;
+    for (const cu of [0.35, 0.68]) {
+      ctx.beginPath();
+      ctx.moveTo(hx - wallW - (4.5 - cu * 6) * s, hb - wallH + 3.5 * s - cu * 14 * s);
+      ctx.quadraticCurveTo(hx, hb - wallH - cu * 19 * s, hx + wallW + (4.5 - cu * 7) * s, hb - wallH + 3.5 * s - cu * 9 * s);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
+    // under-eave shadow ON the wall — the roof presses down, it does not hover
+    dab(ctx, hx, hb - wallH + 2.5 * s, wallW * 1.0, 3.5 * s, 0.015, "#050a12", 0.85);
+    // moon-blue rim along the roof's western shoulder
+    ctx.strokeStyle = "#3c4e74";
+    ctx.globalAlpha = 0.38;
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(hx - wallW - 3 * s, hb - wallH + 2 * s);
+    ctx.quadraticCurveTo(hx - wallW + 7 * s, hb - wallH - 12 * s, hx - 5 * s, hb - wallH - 16 * s);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // chimney — squat, felt-capped (muffled geometry: even smoke is kept quiet)
+    ctx.fillStyle = "#0a1119";
+    ctx.fillRect(hx + 16 * s, hb - wallH - 26 * s, 7 * s, 13 * s);
+    dab(ctx, hx + 19.5 * s, hb - wallH - 27 * s, 5.5 * s, 2.4 * s, 0, "#101a28", 1);
+    // the kept window + its light spilling onto the swept ground
+    keptWindow(ctx, hx - 10 * s, hb - 34 * s, 15 * s, 19 * s, 1, sleeper);
+    dab(ctx, hx - 10 * s, hb + 2, 20 * s, 4 * s, 0, "#c07830", 0.10);
+    dab(ctx, hx - 10 * s, hb + 1, 11 * s, 2.4 * s, 0, "#e09040", 0.10);
     // door — muffled: felt-wrapped latch, moss-padded threshold
     ctx.fillStyle = "#081018";
     ctx.beginPath();
-    ctx.moveTo(hx + 22 * s, hb);
-    ctx.lineTo(hx + 22 * s, hb - 30 * s);
-    ctx.quadraticCurveTo(hx + 29 * s, hb - 36 * s, hx + 36 * s, hb - 30 * s);
-    ctx.lineTo(hx + 36 * s, hb);
+    ctx.moveTo(hx + 20 * s, hb);
+    ctx.lineTo(hx + 20 * s, hb - 28 * s);
+    ctx.quadraticCurveTo(hx + 27 * s, hb - 34 * s, hx + 34 * s, hb - 28 * s);
+    ctx.lineTo(hx + 34 * s, hb);
     ctx.closePath();
     ctx.fill();
-    dab(ctx, hx + 29 * s, hb + 2, 12 * s, 2.4 * s, 0, "#14241c", 0.8); // moss threshold
-    // swept doorstep arc
-    ctx.strokeStyle = "#1c2a40";
+    dab(ctx, hx + 22 * s, hb - 14 * s, 1.4 * s, 1.4 * s, 0, "#1c2838", 1); // wrapped latch
+    dab(ctx, hx + 27 * s, hb + 2, 11 * s, 2.2 * s, 0, "#0f1a14", 0.55); // moss threshold
+    ctx.strokeStyle = "#1c2a40"; // swept doorstep arc
     ctx.globalAlpha = 0.5;
     ctx.lineWidth = 1.6;
     ctx.beginPath();
-    ctx.arc(hx + 29 * s, hb + 4, 16 * s, Math.PI * 1.1, Math.PI * 1.9);
+    ctx.arc(hx + 27 * s, hb + 4, 15 * s, Math.PI * 1.1, Math.PI * 1.9);
     ctx.stroke();
     ctx.globalAlpha = 1;
     if (daisies) {
       // the window box gone feral — wake-daisies where none were planted. A warning.
-      for (let i = 0; i < 6; i++) {
-        const fx0 = hx - 14 * s + R() * 22 * s, fy0 = hb - 28 * s + R() * 4;
+      dab(ctx, hx - 10 * s, hb - 22 * s, 14 * s, 2 * s, 0, "#0a1018", 0.9); // the box
+      for (let i = 0; i < 7; i++) {
+        const fx0 = hx - 20 * s + R() * 20 * s, fy0 = hb - 24 * s + R() * 4;
         for (let p = 0; p < 5; p++) {
           const a = (p / 5) * TAU;
-          dab(ctx, fx0 + Math.cos(a) * 1.8, fy0 + Math.sin(a) * 1.4, 1.3, 0.9, a, "#cfd0bd", 0.8);
+          dab(ctx, fx0 + Math.cos(a) * 2, fy0 + Math.sin(a) * 1.5, 1.4, 1, a, "#cfd0bd", 0.85);
         }
-        dab(ctx, fx0, fy0, 0.9, 0.9, 0, "#8a7d5a", 0.9);
+        dab(ctx, fx0, fy0, 1, 1, 0, "#8a7d5a", 0.9);
       }
-      dab(ctx, hx - 3 * s, hb - 25 * s, 15 * s, 2 * s, 0, "#0a1018", 0.9); // the box
     }
   };
-  houseFront(1500, 2.3, true, false);
-  houseFront(1690, 2.65, false, true);
-  houseFront(1880, 2.4, true, false);
+  // garden walls FIRST (behind the fronts) — the town is a fabric, not parked wagons
+  const gardenWall = (x0: number, x1: number, yb: number) => {
+    ctx.fillStyle = "#0a1220";
+    ctx.beginPath();
+    ctx.moveTo(x0, yb);
+    ctx.lineTo(x0, yb - 20);
+    for (let x = x0; x <= x1; x += 26) {
+      ctx.lineTo(x + 13, yb - 20 - ((x * 7) % 5));
+    }
+    ctx.lineTo(x1, yb - 18);
+    ctx.lineTo(x1, yb);
+    ctx.closePath();
+    ctx.fill();
+    dab(ctx, (x0 + x1) / 2, yb - 21, (x1 - x0) * 0.42, 1.4, 0, "#3c4e74", 0.25);
+  };
+  gardenWall(1400, 1478, 968);
+  gardenWall(1596, 1678, 986);
+  gardenWall(1788, 1868, 974);
+  gardenWall(1975, 2050, 990);
+  houseFront(1490, 965, 2.3, true, false);
+  houseFront(1735, 985, 2.65, false, true);
+  houseFront(1930, 972, 2.4, true, false);
   // the Warden's tall front at the street's end — her lamp burns beside the door
-  houseFront(2070, 2.9, false, false);
-  // her street lamp: horn-paper on a leaning post (moths orbit it at runtime)
-  ctx.strokeStyle = "#0c141e";
-  ctx.lineWidth = 6;
+  houseFront(2140, 990, 2.9, false, false);
+  // her street lamp: horn-paper hung from a bracket post (moths orbit it at runtime).
+  // The post carries a moon rim or the head floats as a sticker (board-caught).
+  ctx.strokeStyle = "#060c14";
+  ctx.lineWidth = 7;
   ctx.lineCap = "round";
   ctx.beginPath();
-  ctx.moveTo(S3_LAMP.x + 4, 988);
-  ctx.lineTo(S3_LAMP.x - 2, S3_LAMP.y + 16);
+  ctx.moveTo(S3_LAMP.x + 9, 990);
+  ctx.lineTo(S3_LAMP.x + 6, S3_LAMP.y - 16);
   ctx.stroke();
-  dab(ctx, S3_LAMP.x - 3, S3_LAMP.y, 7, 9, 0, "#f0b268", 0.9);
-  dab(ctx, S3_LAMP.x - 3, S3_LAMP.y, 16, 19, 0, "#8a4a1c", 0.24);
+  ctx.lineWidth = 4;
+  ctx.beginPath(); // the bracket arm reaching over the street
+  ctx.moveTo(S3_LAMP.x + 6, S3_LAMP.y - 14);
+  ctx.quadraticCurveTo(S3_LAMP.x - 2, S3_LAMP.y - 16, S3_LAMP.x - 4, S3_LAMP.y - 9);
+  ctx.stroke();
+  ctx.strokeStyle = "#4a5c80"; // moonlight finds the post's west edge
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(S3_LAMP.x + 6.5, 984);
+  ctx.lineTo(S3_LAMP.x + 4, S3_LAMP.y - 12);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  dab(ctx, S3_LAMP.x - 3, S3_LAMP.y, 5.5, 7.5, 0, "#f0b268", 0.95);
+  dab(ctx, S3_LAMP.x - 3, S3_LAMP.y - 1, 2.2, 3, 0, "#ffd9a0", 0.9); // the wick's heart
+  dab(ctx, S3_LAMP.x - 3, S3_LAMP.y, 13, 16, 0, "#8a4a1c", 0.22);
+  dab(ctx, S3_LAMP.x - 3, 986, 24, 4.5, 0, "#c07830", 0.10); // her light on the street
 
   // stones + night shrubs in the fields
   for (let i = 0; i < 40; i++) {
@@ -469,6 +610,7 @@ export const SCENE3: SceneDef = {
         bakeFog(381, 800, 890, "#16223c", false),
         s3Fields(),
         bakeFog(383, 855, 950, "#131e34", true),
+        s3StreetBack(),
         s3Ground(),
       ],
       fgA: s3Foreground(-1),
