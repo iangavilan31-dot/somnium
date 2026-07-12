@@ -265,7 +265,9 @@ encounter obeys five beats:
 2. **The threshold** — combat begins only when the players *choose* to cross a visible
    line (step onto the buried bell floor; take the offered thing; break the quiet).
    The world never forces the fight.
-3. **Reluctance** — the boss's first phase warns; aggression is its last resort.
+3. **Reluctance** — the boss wakes and the arena wakes with it (weather shifts, the
+   light changes; for the First Awake: the snowfall thickens, the Ember's glow hardens).
+   Its first phase warns; aggression is its last resort.
 4. **The fight mourns itself** — no triumph music, no health bar; its grief shows.
 5. **Defeat = the world grows QUIETER** — fog clears, birds return, wind changes,
    kept lights answer. The players restored balance; they conquered nothing.
