@@ -23,3 +23,18 @@ _Format: date · element (type) · gate verdict · scene/hue · one-line law-fit
 - 2026-07-12 · The Lullaby leitmotif (audio) · PASS · all scenes · never resolves until "And waking up" · PHASE 4 BUILD
 - 2026-07-12 · UNLULLED CHOIR (boss seed) · PARKED · TBD · silhouette not yet unique · POST-V1, RE-GATE
 - 2026-07-12 · FERRIER'S DEBT (boss seed) · REJECTED-UNTIL · TBD · still describable as "water elemental" · POST-V1, RE-GATE
+- 2026-07-12 · "Knights are the loudest things in this world" (movement identity) · PASS · all scenes · weight-as-fiction; they can't be silent, only careful · CANON (docs/MOVEMENT_AND_COMBAT.md §1)
+- 2026-07-12 · Core verb set + authored traversal verbs (movement) · PASS · per-scene table §2 · trained knight, no arcade verbs; slide/mantle/hang/rope/lift all placed, not systemic · PHASE 1–2 BUILD
+- 2026-07-12 · Jump (gap) verb · PASS W/ FLAG · S2–S5 · ADDITION to BRIEF §7.5 moveset — needs Ian's nod · PHASE 1
+- 2026-07-12 · Deep water = deep dream (boundary) · PASS · S3/S4 · swimming killed; water has meaning instead · CANON
+- 2026-07-12 · Interactive band + surface memory (feel tech) · PASS · all scenes · grass bends, snow/mud remember footprints; pooled, perf-lawful · PHASE 1–2 BUILD
+- 2026-07-12 · The dreamed sword (weapon) · PASS · all scenes · one blade per knight, worn on day one, closed-eye crossguard; wear-as-upgrade · PHASE 2 BUILD
+- 2026-07-12 · Moveset + frame budgets + cancel table (combat) · PASS · combat scenes · weight through declared frames; three distinct light cuts · PHASE 2 BUILD
+- 2026-07-12 · Hush-parry + dual parry (mechanic) · PASS · combat · parry = held breath made mechanical; cloak is the off-hand · PHASE 2 BUILD
+- 2026-07-12 · The quieting / joint quieting (finisher) · PASS · combat · executions look like putting something to rest · PHASE 2 BUILD
+- 2026-07-12 · Toll-sync strikes (co-op combat) · PASS · combat, peaks S5 · strikes that land together land true; world's metronome as beat window · PHASE 2–3 BUILD
+- 2026-07-12 · The catch / the boost / collapsing bridge / split climb (co-op moments) · PASS · S2–S4 · forgiveness as drama; the world is the UI · PHASE 1–2 BUILD
+- 2026-07-12 · Toll-through-the-pad rumble (feel) · PASS · all scenes · the boss felt in the hands from Scene 1 · PHASE 4 BUILD
+- 2026-07-12 · Kept-thing rites (magic system) · PASS · TBD · uncorking preserved moments; no projectiles, no mana · POST-V1, RE-GATE PER RITE
+- 2026-07-12 · Taking up the watch (clapper as NG+ weapon) · SEED · S5 · the price: the Great Bell hangs unguarded · POST-V1, RE-GATE
+- 2026-07-12 · Movement/combat kills: swimming, ziplines, sidestep, 14-weapon arsenal, shields, staff/tome magic, boss-climbing, stamina bar, sync prompts · KILLED · — · see MOVEMENT_AND_COMBAT §17 · KILL-LOG

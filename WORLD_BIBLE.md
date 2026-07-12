@@ -5,6 +5,7 @@
 > 1. `BRIEF.md` — WHAT we are building (goal, scope, phases, non-goals). Supreme on scope.
 > 2. `WORLD_BIBLE.md` (this) — WHAT THE WORLD IS. Supreme on meaning, canon, consistency.
 > 3. `docs/ART_DIRECTION.md` — HOW A FRAME MUST LOOK. Supreme on per-frame execution.
+> 4. `docs/MOVEMENT_AND_COMBAT.md` — HOW THE KNIGHTS FEEL. Supreme on verbs, weight, impact.
 > If any two conflict, flag it to Ian; never silently pick one.
 >
 > **How sessions use this file:** always read §0–§2 (the Gate + the One Law + the Ten Laws).
