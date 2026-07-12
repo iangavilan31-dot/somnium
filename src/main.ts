@@ -164,6 +164,8 @@ function render() {
   knight.draw(ctx);
   ctx.restore();
 
+  // thorn sentinel — just in front of the play plane, frames the west edge
+  drawLayer(scene.thorn);
   // foreground tufts — two baked variants crossfaded = wind
   const wA = 0.5 + 0.5 * Math.sin(t * 0.85 + noise1(t * 0.3) * 1.3);
   drawLayer(scene.fgA, wA);

@@ -72,6 +72,41 @@ function ridgeline(
   ctx.fill();
 }
 
+// painterly cumulus mass — billowed body dabs + crimson under-lit base edge.
+// rim = strength of the sun-side under-lighting (0 = unlit silhouette).
+function cloudMass(
+  ctx: CanvasRenderingContext2D, R: () => number,
+  cx: number, cy: number, w: number, h: number,
+  body: string, alpha: number, rim: number,
+) {
+  // bulk — center-biased scatter, edges sag so the mass reads domed.
+  // many low-alpha dabs, never few strong ones: single ellipse edges read as
+  // digital "bubbles" against the bright disc.
+  for (let i = 0; i < 52; i++) {
+    const ox = (R() + R() - 1) * 0.5 * w;
+    const oy = (R() + R() - 1) * 0.5 * h - Math.abs(ox / w) * h * 0.35;
+    dab(ctx, cx + ox, cy + oy, w * (0.10 + R() * 0.20), h * (0.18 + R() * 0.30),
+      (R() - 0.5) * 0.35, body, alpha * 0.62);
+  }
+  // billow domes along the top arc
+  for (let i = 0; i < 18; i++) {
+    const ox = (R() + R() - 1) * 0.5 * w * 0.9;
+    dab(ctx, cx + ox, cy - h * (0.34 + R() * 0.3) - Math.abs(ox / w) * h * 0.3,
+      w * (0.05 + R() * 0.11), h * (0.12 + R() * 0.18), (R() - 0.5) * 0.5, body, alpha * 0.5);
+  }
+  if (rim > 0) {
+    // crimson under-lighting along the base — hotter the closer it hangs to the sun
+    for (let i = 0; i < 16; i++) {
+      const ox = (R() + R() - 1) * 0.55 * w;
+      const px = cx + ox;
+      const hot = Math.max(0, 1 - Math.hypot(px - SUN_X, cy - SUN_Y) / 1100);
+      dab(ctx, px, cy + h * (0.3 + R() * 0.18) - Math.abs(ox / w) * h * 0.3,
+        w * (0.05 + R() * 0.08), 2.5 + R() * 3.5, (R() - 0.5) * 0.12,
+        R() < 0.6 ? "#5a1a0e" : "#8a2a14", rim * (0.10 + 0.16 * (0.4 + 0.6 * hot)));
+    }
+  }
+}
+
 // ---------- layers ----------
 
 function bakeSky(): Layer {
@@ -104,6 +139,19 @@ function bakeSky(): Layer {
       "#c8b7a3", (big ? 0.5 : 0.15 + R() * 0.3) * (0.25 + 0.75 * fade));
   }
 
+  // the sky is FULL of weather — banked cloud masses, red-bellied, gaps for stars
+  cloudMass(ctx, R, 430, 235, 560, 110, "#160607", 0.11, 0.30);
+  cloudMass(ctx, R, 1080, 130, 660, 100, "#130507", 0.10, 0.18);
+  cloudMass(ctx, R, 1830, 250, 600, 120, "#170708", 0.11, 0.34);
+  cloudMass(ctx, R, 2300, 140, 420, 90, "#130507", 0.09, 0.15);
+  cloudMass(ctx, R, 150, 120, 380, 85, "#130507", 0.09, 0.12);
+
+  // low warm veil in the west — enough light for the thorn sentinel to stand against
+  cloudMass(ctx, R, 330, 530, 500, 130, "#1d0908", 0.10, 0.5);
+  for (let i = 0; i < 24; i++) {
+    dab(ctx, 120 + R() * 520, 430 + R() * 260, 90 + R() * 140, 14 + R() * 18, 0, "#2a0c08", 0.09);
+  }
+
   // faintest, farthest ridge — barely there
   ctx.save();
   ctx.globalAlpha = 0.75;
@@ -116,6 +164,11 @@ function bakeSky(): Layer {
     dab(ctx, SUN_X + (R() - 0.5) * 300, vy, 160 + R() * 180, 4 + R() * 8, (R() - 0.5) * 0.06,
       "#3f0f0c", 0.12);
   }
+
+  // massive masses the disc rises through — under-lit crimson where they face it
+  cloudMass(ctx, R, 1150, 400, 640, 130, "#1a0606", 0.13, 0.85);
+  cloudMass(ctx, R, 700, 480, 460, 110, "#180606", 0.12, 0.6);
+  cloudMass(ctx, R, 1640, 445, 500, 115, "#190606", 0.12, 0.75);
 
   // THE red sun — deep two-stage atmospheric glow
   const haloWide = ctx.createRadialGradient(SUN_X, SUN_Y, SUN_R * 0.9, SUN_X, SUN_Y, SUN_R * 3.1);
@@ -159,28 +212,77 @@ function bakeSky(): Layer {
   ctx.fillRect(SUN_X - SUN_R, SUN_Y - SUN_R, SUN_R * 2, SUN_R * 2);
   ctx.restore();
 
+  // the disc sits IN the weather: billows clip its limbs…
+  // (warm-black bodies — anything blue-leaning reads as a gray bruise on the disc)
+  cloudMass(ctx, R, 940, 352, 300, 70, "#1a0505", 0.12, 0.9);
+  cloudMass(ctx, R, 1400, 705, 340, 80, "#180404", 0.13, 1.0);
+
+  // …and slivers cross its face — soft ragged cloud strips, not scratches:
+  // three overlapping rows of fuzzy dabs with a warm under-glow
+  const wisp = (x0: number, y0: number, len: number, th: number, sag: number, a: number) => {
+    for (let row = -1; row <= 1; row++) {
+      for (let i = 0; i <= 30; i++) {
+        const u = i / 30;
+        const tt = 0.35 + 0.65 * Math.sin(Math.PI * u); // soft ends, no knife points
+        const jy = Math.sin(u * 7.3 + x0 + row * 2.1) * th * 0.5;
+        dab(ctx, x0 + u * len + (Math.sin(u * 13 + row) * 6),
+          y0 + Math.sin(u * Math.PI) * sag + row * th * 0.7 + jy,
+          14 + tt * 26, (1.6 + tt * th * 0.45) * (row === 0 ? 1 : 0.7),
+          0.03, "#170505", a * 0.34 * tt * (row === 0 ? 1 : 0.6));
+      }
+    }
+    for (let i = 6; i <= 24; i++) {
+      const u = i / 30;
+      const tt = Math.sin(Math.PI * u);
+      dab(ctx, x0 + u * len, y0 + Math.sin(u * Math.PI) * sag + th * 1.1 + 1.5,
+        10 + tt * 16, 1.4, 0.03, "#d84a24", 0.07 * tt);
+    }
+  };
+  wisp(905, 468, 540, 7, 10, 0.55);
+  wisp(1000, 585, 420, 10, -8, 0.66);
+  wisp(860, 668, 580, 6, 6, 0.46);
+  wisp(1240, 512, 300, 5, 5, 0.40);
+
+  // soft scattering — faint shafts fanning off the rim, and a horizon bloom
+  for (const [ang, len] of [[-2.35, 780], [-1.95, 880], [-1.5, 920], [-1.05, 840], [-0.65, 760]] as [number, number][]) {
+    dab(ctx, SUN_X + Math.cos(ang) * (SUN_R + len * 0.5), SUN_Y + Math.sin(ang) * (SUN_R + len * 0.5),
+      len * 0.5, 26 + Math.abs(Math.sin(ang)) * 26, ang, "#69190e", 0.05);
+  }
+  dab(ctx, SUN_X, 802, 560, 46, 0, "#5a170c", 0.13);
+
   return { canvas: c, parallax: 0.04, yOff: 0 };
 }
 
 function bakeClouds(seed: number, big: boolean): Layer {
-  const [c, ctx] = makeCanvas(0, 430);
+  const [c, ctx] = makeCanvas(0, big ? 560 : 500);
   const R = mulberry32(seed);
-  const n = big ? 6 : 9;
-  for (let i = 0; i < n; i++) {
-    // keep clusters off the plate edges so the wrap seam crosses clear sky
-    const cx0 = 200 + R() * (WORLD_W - 400);
-    const cy0 = big ? 140 + R() * 220 : 30 + R() * 170;
-    const spread = big ? 300 : 190;
-    for (let j = 0; j < (big ? 10 : 7); j++) {
-      const px = cx0 + (R() - 0.5) * spread, py = cy0 + (R() - 0.5) * (big ? 64 : 26);
-      dab(ctx, px, py, (big ? 70 : 90) + R() * (big ? 120 : 160), (big ? 14 : 4) + R() * (big ? 22 : 6),
-        (R() - 0.5) * 0.2, big ? "#150607" : "#0d0509", big ? 0.16 : 0.28); // translucent — sun glows through
+  if (big) {
+    // massive drifting cumulus — bodies that read, bases burning crimson.
+    // clusters stay off the plate edges so the wrap seam crosses clear sky.
+    for (let i = 0; i < 5; i++) {
+      const cx0 = 320 + R() * (WORLD_W - 640);
+      const cy0 = 210 + R() * 260;
+      cloudMass(ctx, R, cx0, cy0, 300 + R() * 240, 70 + R() * 60, "#130506", 0.14, 0.5 + R() * 0.5);
     }
-    if (big) {
-      // under-lit edges near the sun's altitude
-      for (let j = 0; j < 4; j++) {
-        dab(ctx, cx0 + (R() - 0.5) * spread * 0.8, cy0 + 24 + (R() - 0.5) * 18,
-          40 + R() * 70, 4 + R() * 7, 0, "#2a0c09", 0.16);
+  } else {
+    // high streaks…
+    for (let i = 0; i < 8; i++) {
+      const cx0 = 260 + R() * (WORLD_W - 520);
+      const cy0 = 40 + R() * 200;
+      for (let j = 0; j < 6; j++) {
+        dab(ctx, cx0 + (R() - 0.5) * 300, cy0 + (R() - 0.5) * 22,
+          110 + R() * 170, 4 + R() * 6, (R() - 0.5) * 0.1, "#0f0406", 0.30);
+      }
+    }
+    // …and slivers at the disc's latitude that cross its face as they drift
+    for (let i = 0; i < 7; i++) {
+      const cx0 = 200 + R() * (WORLD_W - 400);
+      const cy0 = 330 + R() * 150;
+      const len = 130 + R() * 200;
+      for (let t = 0; t <= 1; t += 0.08) {
+        const tt = Math.sin(Math.PI * t);
+        dab(ctx, cx0 + (t - 0.5) * len, cy0 + Math.sin(t * 2.4 + i) * 6,
+          10 + tt * 26, 1.5 + tt * 3.5, 0.02, "#160505", 0.5 * (0.4 + 0.6 * tt));
       }
     }
   }
@@ -189,8 +291,16 @@ function bakeClouds(seed: number, big: boolean): Layer {
 
 function bakeRidge(): Layer {
   const [c, ctx] = makeCanvas(540, 920);
-  ridgeline(ctx, 770, 180, "#140b0d", 21);
-  ridgeline(ctx, 800, 215, "#070506", 22);
+  const R = mulberry32(23);
+  // warm scattering above the far ridgeline — the land floats on glowing air
+  for (let i = 0; i < 80; i++) {
+    const x = R() * WORLD_W;
+    const sunBoost = Math.max(0, 1 - Math.abs(x - SUN_X) / 1000);
+    dab(ctx, x, 700 + R() * 90, 100 + R() * 180, 10 + R() * 16, 0, "#3a100b", 0.06 + 0.10 * sunBoost);
+  }
+  // lifted a step toward the sky — atmospheric perspective, not black-on-black
+  ridgeline(ctx, 770, 180, "#1c0f10", 21);
+  ridgeline(ctx, 800, 215, "#0c0709", 22);
 
   // a second, smaller ruin far west — barely there, reward observation
   ctx.save();
@@ -231,6 +341,12 @@ function bakeRidge(): Layer {
 function bakeValley(): Layer {
   const [c, ctx] = makeCanvas(740, 960);
   const R = mulberry32(31);
+  // glowing haze the far ridge rests on — separation before the valley floor
+  for (let i = 0; i < 70; i++) {
+    const x = R() * WORLD_W;
+    const sunBoost = Math.max(0, 1 - Math.abs(x - SUN_X) / 900);
+    dab(ctx, x, 795 + R() * 30, 90 + R() * 160, 8 + R() * 12, 0, "#481610", 0.07 + 0.09 * sunBoost);
+  }
   ctx.fillStyle = "#080d08";
   ctx.beginPath();
   ctx.moveTo(0, PLATE_H);
@@ -243,12 +359,12 @@ function bakeValley(): Layer {
   ctx.fill();
 
   for (let i = 0; i < 120; i++) { // mist where valley meets ridge — full width
-    dab(ctx, R() * WORLD_W, 814 + R() * 36, 70 + R() * 150, 7 + R() * 12, 0, "#241512", 0.12);
+    dab(ctx, R() * WORLD_W, 814 + R() * 36, 70 + R() * 150, 7 + R() * 12, 0, "#2a1712", 0.16);
   }
   // red sun-bleed pooling on the valley floor under the sun column
-  for (let i = 0; i < 60; i++) {
+  for (let i = 0; i < 90; i++) {
     const x = 880 + R() * 620, y = 826 + R() * 50;
-    dab(ctx, x, y, 26 + R() * 60, 3 + R() * 5, 0, "#3a120c", 0.3);
+    dab(ctx, x, y, 26 + R() * 60, 3 + R() * 5, 0, "#3a120c", 0.36);
   }
   for (let i = 0; i < 110; i++) { // distant tree clumps — silhouetted against the mist
     const x = R() * WORLD_W, y = 830 + R() * 60;
@@ -265,7 +381,7 @@ function bakeFog(seed: number, yLo: number, yHi: number, color: string, near: bo
     const cy0 = yLo + R() * (yHi - yLo);
     for (let j = 0; j < 6; j++) {
       dab(ctx, cx0 + (R() - 0.5) * 260, cy0 + (R() - 0.5) * 14,
-        120 + R() * 220, 8 + R() * (near ? 20 : 14), 0, color, near ? 0.06 : 0.05);
+        120 + R() * 220, 8 + R() * (near ? 20 : 14), 0, color, near ? 0.085 : 0.075);
     }
   }
   return { canvas: c, parallax: near ? 0.62 : 0.24, yOff: near ? 810 : 740, drift: near ? -18 : -12 };
@@ -276,6 +392,12 @@ function bakeForest(): Layer {
   const [c, ctx] = makeCanvas(780, 960);
   const R = mulberry32(45);
   const base = (x: number) => 872 - Math.sin(x * 0.0017 + 0.4) * 14;
+  // valley mist the forest rises out of — separates the bands
+  for (let i = 0; i < 60; i++) {
+    const x = R() * WORLD_W;
+    const sunBoost = Math.max(0, 1 - Math.abs(x - SUN_X) / 900);
+    dab(ctx, x, 845 + R() * 26, 80 + R() * 150, 7 + R() * 10, 0, "#401410", 0.06 + 0.08 * sunBoost);
+  }
   // solid under-mass so the band reads as one dark body
   ctx.fillStyle = "#04060a";
   ctx.beginPath();
@@ -351,6 +473,12 @@ const midY = (x: number) => 890 - Math.sin(x * 0.0011 + 1.2) * 44 - Math.sin(x *
 function bakeMidHill(): Layer {
   const [c, ctx] = makeCanvas(750, 1020);
   const R = mulberry32(41);
+  // crest haze — the hill floats on glowing air, hugging the roll of the silhouette
+  for (let x = 0; x <= WORLD_W; x += 18) {
+    const sunBoost = Math.max(0, 1 - Math.abs(x - SUN_X) / 850);
+    dab(ctx, x + (R() - 0.5) * 14, midY(x) - 8 - R() * 26, 40 + R() * 70, 7 + R() * 11, 0,
+      "#451509", 0.05 + 0.10 * sunBoost);
+  }
   ctx.fillStyle = "#060a06";
   ctx.beginPath();
   ctx.moveTo(0, PLATE_H);
@@ -417,6 +545,60 @@ function bakeMidHill(): Layer {
     const x = 850 + R() * 700;
     dab(ctx, x, midY(x) + 2 + R() * 6, 1, 2.5 + R() * 3.5, (R() - 0.5) * 0.6, "#4a170f", 0.4);
   }
+
+  // ruined watch-tower on the eastern roll — the journey's midground promise
+  const tX = 1830, tB = midY(1830) + 4;
+  for (let i = 0; i < 26; i++) { // its own hill
+    dab(ctx, tX + (R() - 0.5) * 150, tB - 8 - R() * R() * 26, 30 + R() * 40, 12 + R() * 14,
+      (R() - 0.5) * 0.2, "#060a06", 0.9);
+  }
+  for (let i = 0; i < 22; i++) { // warm haze pool behind the silhouette so it reads
+    dab(ctx, tX + (R() - 0.5) * 220, tB - 60 - R() * 55, 60 + R() * 80, 10 + R() * 14, 0,
+      "#4d1810", 0.10);
+  }
+  ctx.save();
+  ctx.translate(tX, tB - 24);
+  ctx.rotate(-0.02);
+  ctx.fillStyle = "#05080a";
+  ctx.beginPath(); // tapered shaft, broken crown
+  ctx.moveTo(-13, 0);
+  ctx.lineTo(-10, -78);
+  ctx.lineTo(-11, -84);
+  ctx.lineTo(-6, -84);
+  ctx.lineTo(-6, -90);
+  ctx.lineTo(-1, -90);
+  ctx.lineTo(-1, -83);
+  ctx.lineTo(4, -83);
+  ctx.lineTo(5, -74);
+  ctx.lineTo(9, -70);
+  ctx.lineTo(11, 0);
+  ctx.closePath();
+  ctx.fill();
+  ctx.beginPath(); // collapsed wall running downhill
+  ctx.moveTo(11, 0);
+  ctx.lineTo(11, -26);
+  ctx.lineTo(30, -18);
+  ctx.lineTo(46, -6);
+  ctx.lineTo(48, 4);
+  ctx.closePath();
+  ctx.fill();
+  dab(ctx, -20, 2, 7, 4, 0.3, "#05080a", 1); // rubble
+  dab(ctx, 26, 6, 6, 3.5, -0.2, "#05080a", 1);
+  ctx.strokeStyle = "#6b2114"; // sun-side rim (the sun is west of here)
+  ctx.globalAlpha = 0.5;
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(-12, -4);
+  ctx.lineTo(-9.6, -78);
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+  // two faint warm lights — someone, or something, keeps them lit
+  dab(ctx, -3, -56, 1.5, 2, 0, "#e0904e", 0.75);
+  dab(ctx, -3, -56, 4, 5, 0, "#7a3a1c", 0.22);
+  dab(ctx, 4, -34, 1.2, 1.6, 0, "#c97c40", 0.55);
+  dab(ctx, 4, -34, 3, 4, 0, "#6b3218", 0.16);
+  ctx.restore();
+
   return { canvas: c, parallax: 0.45, yOff: 750 };
 }
 
@@ -441,20 +623,32 @@ function bakeGround(): Layer {
   ctx.closePath();
   ctx.fill();
 
-  // grass dabs, denser + larger near the bottom
-  for (let i = 0; i < 5200; i++) {
+  // dusty warm swaths — the field's coat is patched, not uniform
+  for (let i = 0; i < 26; i++) {
+    const x0 = R() * WORLD_W, y0 = 920 + R() * 320;
+    const col = R() < 0.5 ? "#1c2410" : R() < 0.8 ? "#241f10" : "#2a180d";
+    for (let j = 0; j < 7; j++) {
+      dab(ctx, x0 + (R() - 0.5) * 130, y0 + (R() - 0.5) * 40, 26 + R() * 44, 8 + R() * 12,
+        (R() - 0.5) * 0.25, col, 0.14);
+    }
+  }
+
+  // grass dabs, denser + larger near the bottom — warm dusty variation, nothing uniform
+  for (let i = 0; i < 6400; i++) {
     const x = R() * WORLD_W;
     const top = groundTop(x) + 4;
     const y = top + Math.pow(R(), 0.7) * (PLATE_H - top);
     const depth = (y - top) / (PLATE_H - top);
     const shade = R();
-    const color = shade < 0.55 ? "#0f1a0e" : shade < 0.85 ? "#13210f" : "#1a2b16";
+    const color =
+      shade < 0.40 ? "#0f1a0e" : shade < 0.62 ? "#13210f" : shade < 0.78 ? "#1a2b16" :
+      shade < 0.88 ? "#232a11" : shade < 0.95 ? "#2b2312" : "#34200f";
     dab(ctx, x, y, 1.2 + depth * 2.2, 4 + depth * 11, (R() - 0.5) * 0.9, color, 0.6 + depth * 0.3);
   }
 
   // red sunlight kiss — stronger, in the sun's column
-  for (let i = 0; i < 420; i++) {
-    const x = 850 + R() * 800;
+  for (let i = 0; i < 640; i++) {
+    const x = 800 + R() * 950;
     const y = groundTop(x) + 4 + R() * 95;
     dab(ctx, x, y, 1, 3 + R() * 5.5, (R() - 0.5) * 0.8,
       R() < 0.75 ? "#6b2114" : "#8a2a16", 0.5);
@@ -518,8 +712,30 @@ function bakeGround(): Layer {
     }
   }
 
+  // thorny dead brush — arced canes with barbs
+  const thornBush = (x0: number, y0: number, s: number) => {
+    ctx.strokeStyle = "#0c0805";
+    for (let j = 0; j < 7; j++) {
+      const a = -0.2 - R() * 2.7, len = (9 + R() * 13) * s;
+      const ex = x0 + Math.cos(a) * len, ey = y0 + Math.sin(a) * len;
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo(x0 + Math.cos(a) * len * 0.5, y0 + Math.sin(a) * len * 0.6 - 3, ex, ey);
+      ctx.stroke();
+      for (let b = 0.3; b < 1; b += 0.28) {
+        const bx = x0 + Math.cos(a) * len * b, by = y0 + Math.sin(a) * len * b - 2;
+        ctx.beginPath();
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx + (R() - 0.5) * 2, by - 3 - R() * 2.5);
+        ctx.stroke();
+      }
+    }
+  };
+  for (let i = 0; i < 14; i++) thornBush(R() * WORLD_W, 940 + R() * 300, 0.8 + R() * 0.9);
+
   // scattered stones — red-kissed on the sun side
-  for (let i = 0; i < 38; i++) {
+  for (let i = 0; i < 54; i++) {
     const x = R() * WORLD_W;
     const y = Math.max(groundTop(x) + 24, 880) + R() * 330;
     const s = 3 + R() * 7 + (R() < 0.1 ? 8 : 0); // a few true boulders
@@ -530,7 +746,7 @@ function bakeGround(): Layer {
   }
 
   // dead branches
-  for (let i = 0; i < 12; i++) {
+  for (let i = 0; i < 20; i++) {
     const x = R() * WORLD_W, y = 900 + R() * 320;
     const len = 20 + R() * 34, a = (R() - 0.5) * 0.5;
     ctx.strokeStyle = "#070806";
@@ -563,7 +779,7 @@ function bakeGround(): Layer {
   }
 
   // seed-head stalks
-  for (let i = 0; i < 30; i++) {
+  for (let i = 0; i < 60; i++) {
     const x = R() * WORLD_W, y = 950 + R() * 300;
     const h = 14 + R() * 12;
     ctx.strokeStyle = "#131f12";
@@ -589,8 +805,12 @@ function bakeGround(): Layer {
     const cxx = 1100 + R() * 420, cy = 950 + R() * 120;
     flower(cxx + (R() - 0.5) * 60, cy + (R() - 0.5) * 30, 0.8 + ((cy - 950) / 120) * 1.4);
   }
-  for (let i = 0; i < 60; i++) {
-    flower(R() * WORLD_W, 950 + R() * 260, 0.7 + R() * 0.9);
+  for (let i = 0; i < 200; i++) {
+    flower(R() * WORLD_W, 950 + R() * 280, 0.75 + R() * 1.0);
+  }
+  // a second, looser drift west of the wake patch
+  for (let i = 0; i < 45; i++) {
+    flower(560 + R() * 340, 965 + R() * 200, 0.7 + R() * 1.1);
   }
 
   // leaning wayshrine stone beside the path — someone prayed here once
@@ -626,6 +846,145 @@ function bakeGround(): Layer {
   flower(wx + 11, wy + 5, 0.8);
 
   return { canvas: c, parallax: 1.0, yOff: 790 };
+}
+
+// one-time soft-focus for the nearest plates — painted depth-of-field, not runtime blur
+function soften(c: HTMLCanvasElement, px: number): HTMLCanvasElement {
+  const b = document.createElement("canvas");
+  b.width = c.width; b.height = c.height;
+  const bctx = b.getContext("2d")!;
+  bctx.filter = `blur(${px}px)`;
+  bctx.drawImage(c, 0, 0);
+  return b;
+}
+
+// ---------- the thorn sentinel ----------
+// A gnarled dead thorn tree framing the west edge of the hero shot — its own layer,
+// just in front of the play plane, behind the wind tufts. Red-lit on the sun side.
+function bakeThornTree(): Layer {
+  const [c, ctx] = makeCanvas(380, 1120);
+  const R = mulberry32(77);
+  const INK = "#060404";
+
+  // tapered limb along a quadratic bezier; rim-light on the east (sun) edge
+  const limb = (
+    x0: number, y0: number, cx1: number, cy1: number, x1: number, y1: number,
+    w0: number, w1: number, rim: number,
+  ): [number, number][] => {
+    const pts: [number, number][] = [];
+    const left: [number, number][] = [], right: [number, number][] = [];
+    for (let i = 0; i <= 14; i++) {
+      const u = i / 14;
+      const px = (1 - u) * (1 - u) * x0 + 2 * (1 - u) * u * cx1 + u * u * x1;
+      const py = (1 - u) * (1 - u) * y0 + 2 * (1 - u) * u * cy1 + u * u * y1;
+      const tx = 2 * (1 - u) * (cx1 - x0) + 2 * u * (x1 - cx1);
+      const ty = 2 * (1 - u) * (cy1 - y0) + 2 * u * (y1 - cy1);
+      const tl = Math.hypot(tx, ty) || 1;
+      const nx = -ty / tl, ny = tx / tl;
+      const w = (w0 + (w1 - w0) * u) * 0.5;
+      const kink = 1 + Math.sin(u * 9 + x0) * 0.3; // gnarl: slow, deep width bulges
+      left.push([px + nx * w * kink, py + ny * w * kink]);
+      right.push([px - nx * w * kink, py - ny * w * kink]);
+      pts.push([px, py]);
+    }
+    ctx.fillStyle = INK;
+    ctx.beginPath();
+    ctx.moveTo(left[0][0], left[0][1]);
+    for (const [px, py] of left) ctx.lineTo(px, py);
+    for (let i = right.length - 1; i >= 0; i--) ctx.lineTo(right[i][0], right[i][1]);
+    ctx.closePath();
+    ctx.fill();
+    if (rim > 0) {
+      // the low sun burns the east edge — this rim is what makes the tree read
+      // against the near-black west sky, so it stays hot and wide
+      const side = left[7][0] > right[7][0] ? left : right; // whichever edge faces east
+      ctx.strokeStyle = "#9c2c16";
+      ctx.globalAlpha = rim;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(side[1][0], side[1][1]);
+      for (let i = 2; i < side.length - 1; i++) ctx.lineTo(side[i][0], side[i][1]);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    return pts;
+  };
+
+  const thorns = (pts: [number, number][], every: number, len: number) => {
+    ctx.lineWidth = 1.6;
+    ctx.lineCap = "round";
+    for (let i = 2; i < pts.length - 1; i += every) {
+      const [px, py] = pts[i];
+      const a = -0.3 - R() * 2.5;
+      const l = len * (0.6 + R() * 0.8);
+      const ex = px + Math.cos(a) * l, ey = py + Math.sin(a) * l;
+      const sunlit = Math.cos(a) > 0.35; // east-facing thorns burn whole
+      ctx.strokeStyle = sunlit ? "#7e2412" : INK;
+      ctx.beginPath();
+      ctx.moveTo(px, py);
+      ctx.lineTo(ex, ey);
+      ctx.stroke();
+      if (sunlit) dab(ctx, ex, ey, 1.6, 1.6, 0, "#a03318", 0.55);
+    }
+  };
+
+  // root mound + root flares
+  for (let i = 0; i < 14; i++) {
+    dab(ctx, 470 + (R() - 0.5) * 110, 1072 + (R() - 0.5) * 18, 24 + R() * 30, 9 + R() * 10,
+      (R() - 0.5) * 0.3, "#050703", 1);
+  }
+  limb(470, 1078, 420, 1066, 386, 1074, 26, 6, 0); // west root
+  limb(474, 1078, 532, 1062, 566, 1072, 24, 5, 0.5); // east root
+
+  // trunk in two gnarled stages — a TREE, not a sapling: it dominates the west edge.
+  // The big limbs anchor high so their silhouettes live against the lit sky,
+  // never black-on-black against the ridge bands.
+  limb(470, 1082, 424, 900, 458, 740, 54, 30, 0.75);
+  const t2 = limb(458, 744, 488, 620, 442, 470, 30, 14, 0.7);
+  const a1 = limb(462, 690, 620, 590, 786, 548, 18, 4, 0.75); // the great east limb
+  const a2 = limb(452, 560, 566, 462, 706, 428, 12, 3, 0.65);
+  const a3 = limb(448, 540, 374, 430, 318, 392, 12, 3, 0);    // up-west, off frame
+  limb(466, 896, 396, 850, 344, 828, 10, 3, 0);               // low dead stub west
+  const a5 = limb(442, 476, 462, 396, 440, 348, 10, 2.4, 0.6); // crown spike
+
+  // secondary twigs off the big limbs
+  const tw = (x: number, y: number, ang: number, len: number, w0 = 4) => {
+    const mx = x + Math.cos(ang) * len * 0.5, my = y + Math.sin(ang) * len * 0.55;
+    return limb(x, y, mx + (R() - 0.5) * 12, my - 8, x + Math.cos(ang) * len, y + Math.sin(ang) * len - 6, w0, 1.2, 0);
+  };
+  thorns(tw(600, 606, -0.95, 88, 5), 2, 8);
+  thorns(tw(700, 566, -0.5, 66), 2, 7);
+  thorns(tw(742, 556, 0.5, 58), 2, 7);
+  thorns(tw(660, 586, 0.35, 52), 3, 6);
+  thorns(tw(540, 490, -1.2, 72, 5), 2, 7);
+  thorns(tw(640, 442, 0.2, 52), 2, 6);
+  thorns(tw(620, 450, -0.7, 46), 3, 6);
+  thorns(tw(392, 444, -1.5, 54), 3, 7);
+  thorns(tw(350, 420, 0.35, 40), 3, 6);
+  thorns(tw(452, 400, -0.4, 46), 3, 6);
+  tw(392, 848, 0.55, 36, 3);
+
+  thorns(a1, 1, 9);
+  thorns(a2, 2, 8);
+  thorns(a3, 2, 7);
+  thorns(a5, 2, 7);
+  thorns(t2, 3, 9);
+
+  // grass and stones at the base tie it into the field
+  for (let i = 0; i < 26; i++) {
+    const gx = 470 + (R() - 0.5) * 130, gy = 1076 + (R() - 0.5) * 14;
+    const gh = 14 + R() * 22;
+    ctx.strokeStyle = "#081007";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(gx, gy);
+    ctx.quadraticCurveTo(gx + (R() - 0.5) * 8, gy - gh * 0.6, gx + (R() - 0.5) * 16, gy - gh);
+    ctx.stroke();
+  }
+  dab(ctx, 522, 1080, 6, 4, 0.2, "#0a0a0d", 1);
+  dab(ctx, 415, 1086, 4.5, 3, -0.3, "#0a0a0d", 1);
+
+  return { canvas: c, parallax: 1.12, yOff: 380 };
 }
 
 function bakeForeground(sway: number): Layer {
@@ -676,7 +1035,7 @@ function bakeForeground(sway: number): Layer {
     ctx.quadraticCurveTo(x + lean * h * 0.4, y - h * 0.55, x + lean * h, y - h);
     ctx.stroke();
   }
-  return { canvas: c, parallax: 1.22, yOff: 930 };
+  return { canvas: soften(c, 1.6), parallax: 1.22, yOff: 930 };
 }
 
 // nearest framing layer — giant soft silhouettes hugging the frame edges
@@ -721,10 +1080,38 @@ function bakeNearFrame(): Layer {
     ctx.stroke();
   }
 
-  // (no corner canopy: the vignette owns the top corners — a black mass there is
-  // an invisible feature. Framing is carried by blades, rocks, giant flowers, log.)
+  // thorn brambles arcing through the bottom corners
+  const bramble = (x0: number, y0: number, dir: number, s: number) => {
+    ctx.strokeStyle = "#030402";
+    ctx.lineCap = "round";
+    for (let j = 0; j < 5; j++) {
+      const a = -0.15 - R() * 0.9, len = (90 + R() * 120) * s;
+      const ex = x0 + dir * Math.cos(a) * len, ey = y0 - Math.sin(a) * len * 0.8;
+      ctx.lineWidth = (4 + R() * 3) * s;
+      ctx.beginPath();
+      ctx.moveTo(x0, y0);
+      ctx.quadraticCurveTo(x0 + dir * Math.cos(a) * len * 0.5, y0 - Math.sin(a) * len * 0.95, ex, ey);
+      ctx.stroke();
+      for (let b = 0.25; b < 1; b += 0.17) { // barbs
+        const bx = x0 + dir * Math.cos(a) * len * b;
+        const by = y0 - Math.sin(a) * len * 0.85 * b;
+        ctx.lineWidth = 2.2 * s;
+        ctx.beginPath();
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx + dir * 6 * s, by - (6 + R() * 5) * s);
+        ctx.stroke();
+      }
+    }
+  };
+  bramble(60, 1280, 1, 1.1);
+  bramble(2340, 1290, -1, 1.3);
+  bigFlower(390, 1180, 1.05, -0.5);
 
-  return { canvas: c, parallax: 1.45, yOff: 940 };
+  // (no corner canopy: the vignette owns the top corners — a black mass there is
+  // an invisible feature. Framing is carried by blades, rocks, giant flowers, log,
+  // and now the corner brambles.)
+
+  return { canvas: soften(c, 3.2), parallax: 1.45, yOff: 940 };
 }
 
 // ---------- grade passes ----------
@@ -774,18 +1161,24 @@ export function bakeGlowSprite(): HTMLCanvasElement {
   return c;
 }
 
-export function bakeScene(): { layers: Layer[]; fgA: Layer; fgB: Layer; near: Layer } {
+export function bakeScene(): { layers: Layer[]; fgA: Layer; fgB: Layer; near: Layer; thorn: Layer } {
   const layers = [
     bakeSky(),
-    bakeClouds(71, false), // high thin streaks
-    bakeClouds(72, true),  // low masses
+    bakeClouds(71, false), // high thin streaks + disc-crossing slivers
+    bakeClouds(72, true),  // low massive cumulus
     bakeRidge(),
     bakeValley(),
-    bakeFog(81, 795, 885, "#2a1210", false),
+    bakeFog(81, 795, 885, "#331611", false),
     bakeForest(),
     bakeMidHill(),
-    bakeFog(82, 850, 950, "#241010", true),
+    bakeFog(82, 850, 950, "#2b1310", true),
     bakeGround(),
   ];
-  return { layers, fgA: bakeForeground(-1), fgB: bakeForeground(1), near: bakeNearFrame() };
+  return {
+    layers,
+    fgA: bakeForeground(-1),
+    fgB: bakeForeground(1),
+    near: bakeNearFrame(),
+    thorn: bakeThornTree(),
+  };
 }

@@ -71,3 +71,26 @@ Budget headroom is enormous; 60fps bar cleared ~2.7× at the display's refresh c
    `scripts/diag-fps2.mjs`); in-page MediaRecorder drops frames AND compresses
    timestamps (fast-motion lie). Final pipeline: native-res recordVideo, wall-true
    timing, game at 165fps throughout, honest fps read from `window.__perf` only.
+12. (iteration 3, vs Ian's benchmark board — all five gaps worked in priority order)
+   **Sky/cloud drama:** painterly `cloudMass` builder (52 low-alpha bulk dabs +
+   billow domes + crimson under-lit base keyed to sun distance); banked masses
+   across the upper sky, three massive masses behind the disc, billows clipping
+   both limbs, four soft slivers crossing the face, light shafts fanning off the
+   rim, horizon bloom; both drifting cloud layers rebuilt on the same builder.
+   **Field density:** 6400 grass dabs in a 6-color warm palette (olive/brown/rust
+   minorities), dusty ground swaths, 245 more readable daisies full-width + a west
+   drift, thorn bushes with barbs, more stones/branches/seed-heads, wider red kiss.
+   **Haze separation:** glowing warm air band behind every silhouette crest (ridge,
+   valley, forest, midhill — sun-column boosted), fog layers +50% alpha, warmer;
+   ridge colors lifted off true black. **Ruined tower** on its own mound at the
+   eastern midhill roll, haze pool behind it, two kept-lit warm windows.
+   **Thorn sentinel:** new parallax-1.12 layer, gnarled tapered-bezier limbs.
+   **Near frame:** corner brambles + baked soft-focus blur (painted DOF).
+13. (iteration 3 QA, caught by LOOKING at native stills) Face-crossing wisps read
+   as straight scratches → rebuilt as 3 overlapping rows of fuzzy soft-ended dabs.
+   Billow dabs read as circle "bubbles" against the bright disc → 52 dabs at 0.62×
+   alpha instead of 30 strong ones; bodies warmed (blue-leaning read as gray bruise).
+   Thorn tree read as an invisible sapling (ink on black, floating rim whiskers) →
+   trunk 54px w/ deep gnarl bulges, limbs re-anchored high against the lit sky,
+   warm west veil added behind it, hot 2.4px rims, east-facing thorns burn whole.
+   Perf after everything: 165fps, sim 0.15ms, render 0.82ms during action.
