@@ -63,7 +63,10 @@ export class PlayerInput {
   attackPressed() { return this.key("KeyJ") || this.key("KeyX") || this.padEdge(0); } // cross/A tap = light
   heavyPressed() { return this.key("KeyI") || this.padEdge(7); }  // RT press starts the charge
   heavyHeld() { return this.keyHeld("KeyI") || this.padHeld(7); } // release fires the heavy
-  rollPressed() { return this.key("KeyK") || this.padEdge(1); }   // B tap: roll (dir) / backstep (neutral)
+  rollPressed() { // B/K SHORT RELEASE: roll (dir) / backstep (neutral); the hold is sprint
+    return (this.useKeyboard && this.hub.shortTaps.has("KeyK"))
+      || (this.padIndex >= 0 && this.hub.padShortTaps.has(`${this.padIndex}:1`));
+  }
   sprintHeld() {                                                  // hold-to-sprint (Souls muscle memory)
     return this.keyHeld("ShiftLeft") || this.keyHeld("ShiftRight") || this.keyHeld("KeyK") || this.padHeld(1);
   }
@@ -79,6 +82,10 @@ export class InputHub {
   keys = new Set<string>();
   edges = new Set<string>();
   padEdges = new Map<number, Set<number>>();
+  // roll fires on short RELEASE (<180ms) so hold-to-sprint never costs a roll —
+  // the actual Souls muscle memory (M&C §10 input law, corrected in the v2 run)
+  shortTaps = new Set<string>();
+  padShortTaps = new Set<string>(); // "padIndex:button"
   anyKeyThisFrame = false;
   keyboardSpoke = false; // has the keyboard EVER driven movement/attack this scene
   p1: PlayerInput;
@@ -86,6 +93,8 @@ export class InputHub {
   p2JoinRequested = false; // set the frame an unclaimed pad claims P2
 
   private padPrev = new Map<number, Set<number>>();
+  private keyDownT = new Map<string, number>();
+  private padDownT = new Map<string, number>();
 
   constructor() {
     this.p1 = new PlayerInput(this, true);
@@ -94,10 +103,14 @@ export class InputHub {
       if (e.repeat) return;
       this.keys.add(e.code);
       this.edges.add(e.code);
+      this.keyDownT.set(e.code, performance.now());
       this.anyKeyThisFrame = true;
       this.keyboardSpoke = true;
     });
-    window.addEventListener("keyup", (e) => this.keys.delete(e.code));
+    window.addEventListener("keyup", (e) => {
+      this.keys.delete(e.code);
+      if (performance.now() - (this.keyDownT.get(e.code) ?? 0) < 180) this.shortTaps.add(e.code);
+    });
     window.addEventListener("blur", () => this.keys.clear());
   }
 
@@ -114,7 +127,13 @@ export class InputHub {
       edges.clear();
       let anyPress = false;
       p.buttons.forEach((b, bi) => {
-        if (b.pressed && !prev.has(bi)) { edges.add(bi); anyPress = true; this.anyKeyThisFrame = true; }
+        if (b.pressed && !prev.has(bi)) {
+          edges.add(bi); anyPress = true; this.anyKeyThisFrame = true;
+          this.padDownT.set(`${i}:${bi}`, performance.now());
+        }
+        if (!b.pressed && prev.has(bi)) {
+          if (performance.now() - (this.padDownT.get(`${i}:${bi}`) ?? 0) < 180) this.padShortTaps.add(`${i}:${bi}`);
+        }
         if (b.pressed) prev.add(bi); else prev.delete(bi);
       });
       // slot claiming — the drop-in doorway
@@ -133,6 +152,8 @@ export class InputHub {
   debugPressed() { return this.edges.has("F1"); }
   endFrame() {
     this.edges.clear();
+    this.shortTaps.clear();
+    this.padShortTaps.clear();
     this.anyKeyThisFrame = false;
   }
 }

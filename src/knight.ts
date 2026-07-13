@@ -535,6 +535,27 @@ export class Knight {
     return Math.max(base, impulse);
   }
 
+  // the cry (§21): pressure, not a wound — it shoves and interrupts, it does not cut
+  tryStagger(fromX: number, fx: Fx): boolean {
+    if (this.state === "wake" || this.state === "prelude" || this.state === "rise") return false;
+    if (this.state === "collapse" || this.state === "crawl" || this.state === "quieting") return false;
+    if (this.invulnerable || this.state === "roll") return false;
+    if (this.parryOpen) { // the hush catches even a wail
+      this.parryHold = 0.3; this.lastParryT = this.tNow;
+      this.noise = 0.2; this.noiseT = this.tNow;
+      fx.stall(0.3);
+      return false;
+    }
+    const away = this.x >= fromX ? 1 : -1;
+    if (this.state === "guard") { this.vx = away * 120; this.guardJolt = 0.12; return false; }
+    if (this.state === "jump") { this.h = 0; this.vh = 0; this.jumpAtkT = -1; this.airStrike = null; }
+    this.vx = away * 260;
+    this.hitFlash = 0.08;
+    this.chainBuf = 0; this.heavyBuf = 0; this.rollBuf = 0; // §19 buffer honesty
+    this.state = "hit"; this.stateT = 0;
+    return true;
+  }
+
   tryHit(fx: Fx, heavy = false): "immune" | "parried" | "blocked" | "hit" | "downed" {
     if (this.state === "wake" || this.state === "prelude" || this.state === "rise") return "immune";
     if (this.state === "collapse" || this.state === "crawl") return "immune";

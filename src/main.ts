@@ -9,7 +9,7 @@ import { Fx } from "./fx";
 import { InputHub, type PlayerInput } from "./input";
 import { drawDebug, type Perf } from "./debug";
 import { Campfire, SCENES, type SceneBake, type SceneDef } from "./journey";
-import { Shade, SHADE_SPAWNS } from "./stirred";
+import { Shade, SHADE_SPAWNS, type ShadeKind } from "./stirred";
 import { FirstAwake, AWAKE_X, FLOOR_L, FLOOR_R } from "./awake";
 import { BoundPost, YARD, YARD_IDX } from "./yard";
 import "./scenes/index"; // registers scenes 2+ into SCENES
@@ -53,8 +53,8 @@ function enterScene(idx: number, freshKnights: boolean) {
   fx.setScene(scene.id === YARD.id ? 1 : scene.id); // the yard borrows S1's air
   const bandN = scene.bandMin ?? BAND_MIN, bandF = scene.bandMax ?? BAND_MAX;
   // the Stirred slept scattered across the band, not on one line (§18)
-  shades = (SHADE_SPAWNS[scene.id] ?? []).map((x, i) => {
-    const s = new Shade(x, lerp(bandN * 0.6, bandF * 0.6, (i % 3) / 2));
+  shades = (SHADE_SPAWNS[scene.id] ?? []).map((e, i) => {
+    const s = new Shade(e.x, lerp(bandN * 0.6, bandF * 0.6, (i % 3) / 2), e.k);
     s.bandMin = bandN; s.bandMax = bandF;
     return s;
   });
@@ -274,13 +274,19 @@ function sim(dt: number) {
     p1.startWake();
   }
 
-  // ---- yard spawn keys (dev harness §22): 1 = a sparring Stirred, 0 = settle all ----
+  // ---- yard spawn keys (dev harness §22): 1–6 = the roster, 0 = settle all ----
   if (yardMode) {
-    if (hub.edges.has("Digit1")) {
-      const s = new Shade(p1.x + (p1.facing > 0 ? 260 : -260), p1.z);
-      s.bandMin = p1.bandMin; s.bandMax = p1.bandMax;
-      shades.push(s);
-      hushBeatArmed = true;
+    const ROSTER: [string, ShadeKind][] = [
+      ["Digit1", "stirred"], ["Digit2", "sealed"], ["Digit3", "startled"],
+      ["Digit4", "burdened"], ["Digit5", "crier"], ["Digit6", "remembered"],
+    ];
+    for (const [code, kind] of ROSTER) {
+      if (hub.edges.has(code)) {
+        const s = new Shade(p1.x + (p1.facing > 0 ? 280 : -280), p1.z, kind);
+        s.bandMin = p1.bandMin; s.bandMax = p1.bandMax;
+        shades.push(s);
+        hushBeatArmed = true;
+      }
     }
     if (hub.edges.has("Digit0")) { for (const s of shades) if (s.alive) s.beginQuieting(); }
   }
@@ -314,7 +320,7 @@ function sim(dt: number) {
       if (!s.alive) continue;
       // §18: generous to hit — the swing owns a wide z-band, never robbed by depth
       if (Math.abs(s.x - ev.x) < ev.reach && Math.abs(s.z - ev.z) < ev.zTol) {
-        if (s.struck(ev.heavy, k.x, fx) !== "glance") landed = true;
+        if (s.struck(ev.heavy, k.x, fx, k.z) !== "glance") landed = true;
       }
     }
     // the Bound Post takes every strike — hitstop must feel right against felt (§22)
@@ -329,12 +335,31 @@ function sim(dt: number) {
   for (const s of shades) {
     const sev = s.strikeEvent();
     if (sev) {
+      let connected = false;
       for (const k of [p1, k2]) {
         // §18: honest to dodge — walking the band narrows the knight's hurt z-band
         if (!k || Math.abs(k.x - sev.x) >= sev.reach || Math.abs(k.z - sev.z) >= Math.min(sev.zTol, k.hurtZ())) continue;
         const out = k.tryHit(fx);
+        if (out !== "immune") connected = true;
         if (out === "parried") s.stall(); // its ink caught mid-stroke (§11)
         else if (out === "hit" || out === "downed") hitstopT = Math.max(hitstopT, 3 / 60);
+      }
+      if (!connected) s.noteWhiff(); // the Startled sprawls in the grass it missed (§21)
+    }
+    // THE CRIER's wail arrives as a ring in the world, not a projectile (§21):
+    // it shoves the knights, and every sleeping Stirred in earshot begins to stir
+    const cry = s.cryEvent();
+    if (cry) {
+      fx.tollRing(cry.x, s.groundY() + 2);
+      fx.notifyNoise(cry.x, 4.5);
+      for (const k of [p1, k2]) {
+        if (!k) continue;
+        if (Math.hypot(k.x - cry.x, (k.z - cry.z) * 2.2) < 240) k.tryStagger(cry.x, fx);
+      }
+      for (const o of shades) {
+        if (o !== s && o.alive && o.state === "settled" && Math.abs(o.x - cry.x) < 420) {
+          o.state = "stir"; o.stateT = 0;
+        }
       }
     }
     s.update(adt, t, knights, fx, fire ? fire.x : null);

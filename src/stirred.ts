@@ -42,7 +42,45 @@ const ATK_STRIKE_T = 24 / 60; // the crash begins here — the knight's answer w
 const ATK_TOTAL = 48 / 60;
 
 export type ShadeState =
-  | "settled" | "stir" | "drawn" | "attack" | "stagger" | "stalled" | "quieted" | "gone";
+  | "settled" | "stir" | "drawn" | "attack" | "cry" | "stagger" | "stalled" | "quieted" | "gone";
+
+// ---- THE ROSTER (M&C §21) — each kind teaches ONE lesson; all are Stirred ----
+export type ShadeKind = "stirred" | "sealed" | "startled" | "burdened" | "crier" | "remembered";
+
+interface KindDef {
+  scale: number;       // rig scale on top of the base 1.12
+  posture: number;     // strikes-to-stagger
+  dents0: number;      // 3 = no plate (lights always connect)
+  walk: number;        // approach px/s
+  gap: number;         // strike range
+  reach: number;       // strike event reach
+  cd: [number, number];// attack cooldown base + jitter
+  anticipMul: number;  // telegraph length multiplier on the base 24f rear-up
+  lightsAlwaysGlance?: boolean; // the Burdened: only heavies speak to it
+  frontSealed?: boolean;        // the Sealed: its front glances EVERYTHING — flank it
+  patient?: boolean;            // the Sealed: never strikes first; answers lingerers
+  kite?: boolean;               // the Crier: keeps its distance
+  cries?: boolean;              // the Crier: the wail IS the ranged attack
+  sprawlOnWhiff?: boolean;      // the Startled: a missed lunge leaves it sprawled
+  lunges?: boolean;             // the Startled: crosses the gap in a burst
+  drill?: boolean;              // the Remembered: keeper cadence, upright, grief on parry
+  turnRate: number;    // facing turns/s — the Sealed turns slowly (flankable)
+}
+
+export const KINDS: Record<ShadeKind, KindDef> = {
+  // the teacher — timing and spacing (built Phase 2b, unchanged)
+  stirred:    { scale: 1.00, posture: 3, dents0: 0, walk: 55, gap: 88,  reach: 78,  cd: [1.1, 0.35], anticipMul: 1.0, turnRate: 12 },
+  // plate fused into a wall — the band exists; walk around the wall
+  sealed:     { scale: 1.06, posture: 4, dents0: 0, walk: 34, gap: 78,  reach: 72,  cd: [1.6, 0.3],  anticipMul: 1.1, frontSealed: true, patient: true, turnRate: 0.35 },
+  // too many elbows — reaction and the depth-roll; sprawls when it misses
+  startled:   { scale: 0.88, posture: 2, dents0: 3, walk: 96, gap: 150, reach: 84,  cd: [0.9, 0.5],  anticipMul: 1.1, lunges: true, sprawlOnWhiff: true, turnRate: 18 },
+  // the bound bell must never touch ground — patience; heavies are the only sentence
+  burdened:   { scale: 1.52, posture: 6, dents0: 0, walk: 26, gap: 108, reach: 108, cd: [2.2, 0.5],  anticipMul: 1.5, lightsAlwaysGlance: true, turnRate: 4 },
+  // the wail is the weapon — pressure and priority; kill the noise first
+  crier:      { scale: 0.96, posture: 2, dents0: 3, walk: 40, gap: 560, reach: 0,   cd: [3.2, 0.8],  anticipMul: 1.7, kite: true, cries: true, turnRate: 10 },
+  // keeper staff-drill — THE parry teacher; parried, it kneels a beat (grief, not stun)
+  remembered: { scale: 1.04, posture: 3, dents0: 0, walk: 48, gap: 96,  reach: 84,  cd: [1.6, 0.05], anticipMul: 1.0, drill: true, turnRate: 12 },
+};
 
 export class Shade {
   x: number; facing = 1;
@@ -62,28 +100,65 @@ export class Shade {
   private strikeFired = false;
   private calmT = 0;          // silence accumulator → settling back
   private attackCd = 0;       // breath between blows — readable, answerable
+  private lingerT = 0;        // how long a knight has stood at the Sealed's face
 
-  constructor(x: number, z = 0) {
+  kind: ShadeKind;
+  def: KindDef;
+  private turnT = 0;      // the Sealed turns like a door, not a dancer
+  private sprawled = false;
+  private cryFired = false;
+  private pendingCry: { x: number; z: number } | null = null;
+
+  constructor(x: number, z = 0, kind: ShadeKind = "stirred") {
     this.x = x; this.home = x;
     this.z = z; this.homeZ = z;
+    this.kind = kind; this.def = KINDS[kind];
+    this.posture = this.def.posture;
+    this.dents = this.def.dents0;
     this.seed = (x * 7.13) % 10;
   }
 
   groundY() { return GROUND_Y + this.z * Z_SLOPE; }
   zScale() { return 1 + this.z * Z_SCALE; }
 
+  // slow-turning kinds are flanked by walking the band — the whole lesson (§21)
+  private faceToward(tx: number, dt: number) {
+    const want = tx >= this.x ? 1 : -1;
+    if (want === this.facing) { this.turnT = 0; return; }
+    this.turnT += dt;
+    if (this.turnT >= 1 / this.def.turnRate) { this.facing = want; this.turnT = 0; }
+  }
+
   get staggered() { return this.state === "stagger" || this.state === "stalled"; }
   get alive() { return this.state !== "quieted" && this.state !== "gone"; }
   get threatening() { return this.alive && this.state !== "settled" && this.state !== "stir"; }
 
   // a knight's blade arrives. Returns what the steel found.
-  struck(heavy: boolean, fromX: number, fx: Fx): "glance" | "hit" | "stagger" {
+  struck(heavy: boolean, fromX: number, fx: Fx, fromZ?: number): "glance" | "hit" | "stagger" {
     if (!this.alive) return "glance";
     const dir = this.x >= fromX ? 1 : -1;
+    // THE SEALED (§21): its front glances EVERYTHING — heavy or light. A cut from
+    // behind, or from a clearly different band lane, finds the SEAM — and the seam
+    // does not glance anything: flanking is always rewarded (skip the plate rule).
+    let seamFound = false;
+    if (this.def.frontSealed && this.state !== "stagger" && this.state !== "stalled") {
+      const fromFront = dir === -this.facing; // struck on the face it holds
+      const fromOtherLane = fromZ != null && Math.abs(fromZ - this.z) > 14;
+      if (fromFront && !fromOtherLane) {
+        fx.glance(this.x - dir * 22, this.groundY() - 60, dir);
+        return "glance";
+      }
+      seamFound = true;
+    }
+    // THE BURDENED (§21): lights never speak to it — only the heavy sentence counts
+    if (this.def.lightsAlwaysGlance && !heavy && this.state !== "stagger" && this.state !== "stalled") {
+      fx.glance(this.x - dir * 20, this.groundY() - 64, dir);
+      return "glance";
+    }
     // Loud Age plate: undented shades GLANCE light blows away (teaches the heavy —
     // §13) unless caught open (recovering, staggered, stalled, or still asleep)
-    const open = this.state === "stagger" || this.state === "stalled" || this.state === "settled"
-      || (this.state === "attack" && this.stateT > ATK_STRIKE_T + 4 / 60);
+    const open = seamFound || this.state === "stagger" || this.state === "stalled" || this.state === "settled"
+      || ((this.state === "attack" || this.state === "cry") && this.stateT > this.strikeT() + 4 / 60);
     if (!heavy && this.dents === 0 && !open) {
       fx.glance(this.x - dir * 18, this.groundY() - 58, dir);
       return "glance";
@@ -91,7 +166,7 @@ export class Shade {
     if (heavy) { this.dents = Math.min(3, this.dents + 1); }
     this.posture = Math.max(0, this.posture - (heavy ? 2 : 1));
     this.hitFlash = 0.12;
-    this.x += dir * (heavy ? 26 : 12);
+    this.x += dir * (heavy ? 26 : 12) / (this.def.scale * this.def.scale); // mass answers (§12)
     fx.inkSplash(this.x - dir * 10, this.groundY() - 52, dir, heavy ? 10 : 6);
     if (this.posture === 0 && !this.staggered) {
       this.state = "stagger"; this.stateT = 0;
@@ -101,7 +176,7 @@ export class Shade {
     return "hit";
   }
 
-  // the parry stalled its ink mid-stroke (§11)
+  // the parry stalled its ink mid-stroke (§11); the Remembered KNEELS — grief, not stun
   stall() {
     if (this.state === "attack") { this.state = "stalled"; this.stateT = 0; }
   }
@@ -110,12 +185,31 @@ export class Shade {
     this.state = "quieted"; this.stateT = 0;
   }
 
+  // §21 telegraph lengths stretch per kind (the Burdened rears for half a breath more)
+  strikeT() { return ATK_STRIKE_T * this.def.anticipMul; }
+  totalT() { return ATK_TOTAL * this.def.anticipMul; }
+
   // returns a pending strike zone once per attack, at the crash frame
   strikeEvent(): { x: number; z: number; zTol: number; reach: number } | null {
     if (this.state !== "attack") { this.strikeFired = false; return null; }
-    if (this.strikeFired || this.stateT < ATK_STRIKE_T) return null;
+    if (this.strikeFired || this.stateT < this.strikeT()) return null;
     this.strikeFired = true;
-    return { x: this.x + this.facing * 62, z: this.z, zTol: Z_TOL, reach: 78 };
+    return { x: this.x + this.facing * 62 * this.def.scale, z: this.z, zTol: Z_TOL, reach: this.def.reach };
+  }
+
+  // THE CRIER: the wail leaves once, at the throat's full stretch — main resolves it
+  cryEvent(): { x: number; z: number } | null {
+    if (!this.pendingCry) return null;
+    const c = this.pendingCry; this.pendingCry = null;
+    return c;
+  }
+
+  // a missed lunge leaves the Startled sprawled in the grass — the punish window
+  noteWhiff() {
+    if (this.def.sprawlOnWhiff && this.state === "attack") {
+      this.sprawled = true;
+      this.state = "stagger"; this.stateT = 0;
+    }
   }
 
   update(dt: number, t: number, knights: (Knight | null)[], fx: Fx, fireX: number | null = null) {
@@ -167,7 +261,7 @@ export class Shade {
         this.attackCd -= dt;
         if (target && best > 0.25) {
           this.calmT = 0;
-          this.facing = target.x >= this.x ? 1 : -1;
+          this.faceToward(target.x, dt); // the Sealed turns like a door (§21)
           const gap = Math.abs(target.x - this.x);
           const dz = target.z - this.z;
           // §18/§21: it seeks the band line FIRST — alignment is its telegraph.
@@ -176,15 +270,28 @@ export class Shade {
             this.z = clamp(this.z + Math.sign(dz) * Math.min(38 * dt, Math.abs(dz)), this.bandMin, this.bandMax);
             this.walkPhase += 1.2 * dt;
           }
-          if (gap > 88) {
-            this.x += 55 * this.facing * dt;
-            this.walkPhase += 2.4 * dt;
-          } else if (this.attackCd <= 0 && Math.abs(dz) < 20) {
-            this.state = "attack"; this.stateT = 0; this.strikeFired = false;
-            this.attackCd = 1.1 + (noise1(this.seed * 5) + 1) * 0.35;
+          if (this.def.kite && gap < 320) {
+            // THE CRIER backs away — the noise wants room to be heard
+            const away = this.x >= target.x ? 1 : -1;
+            this.x += this.def.walk * away * dt;
+            this.walkPhase += 1.6 * dt;
+          } else if (gap > this.def.gap) {
+            this.x += this.def.walk * this.facing * dt;
+            this.walkPhase += (this.def.walk / 23) * dt;
           }
+          const aligned = Math.abs(dz) < 20;
+          const faced = (target.x >= this.x ? 1 : -1) === this.facing;
+          // THE SEALED never strikes first — it answers only knights who LINGER at its face
+          const may = this.def.patient ? this.lingerT > 2.4 : true;
+          if (this.attackCd <= 0 && aligned && faced && may && gap <= this.def.gap) {
+            this.state = this.def.cries ? "cry" : "attack";
+            this.stateT = 0; this.strikeFired = false; this.cryFired = false;
+            this.attackCd = this.def.cd[0] + (noise1(this.seed * 5) + 1) * this.def.cd[1];
+          }
+          this.lingerT = gap <= this.def.gap + 24 ? this.lingerT + dt : 0;
         } else {
           // silence. the fight can be un-had — drift home, kneel back into the dream
+          this.lingerT = 0;
           this.calmT += dt;
           const dh = this.home - this.x;
           const dhz = this.homeZ - this.z;
@@ -195,34 +302,64 @@ export class Shade {
             this.facing = dh >= 0 ? 1 : -1;
           } else if (this.calmT > 6) {
             this.state = "settled"; this.stateT = 0;
-            this.posture = Math.min(3, this.posture + 1); // sleep knits posture
+            this.posture = Math.min(this.def.posture, this.posture + 1); // sleep knits posture
           }
         }
         break;
       }
       case "attack": {
-        pose = sampleTimeline(ATTACK, this.stateT);
+        pose = sampleTimeline(ATTACK, this.stateT / this.def.anticipMul);
         rate = 18;
-        if (this.stateT >= ATK_TOTAL) { this.state = "drawn"; this.stateT = 0; }
+        // THE STARTLED crosses the gap IN the crash — long warning, fast arrival (§21)
+        if (this.def.lunges && this.stateT >= this.strikeT() && this.stateT < this.strikeT() + 8 / 60) {
+          this.x += 340 * this.facing * dt;
+        }
+        if (this.stateT >= this.totalT()) { this.state = "drawn"; this.stateT = 0; }
+        break;
+      }
+      case "cry": {
+        // the head throws back, the jaw unhinges, and the field is TOLD (§21).
+        // No projectile — the ripple ring is the attack, and it wakes the sleeping.
+        const u = clamp(this.stateT / this.strikeT(), 0, 1);
+        pose = { ...RISEN };
+        pose.torso -= rad(30) * u;  // arches back
+        pose.head -= rad(56) * u;   // throat to the sky
+        pose.sword = RISEN.sword;   // the blade hangs forgotten
+        rate = 12;
+        if (!this.cryFired && this.stateT >= this.strikeT()) {
+          this.cryFired = true;
+          this.pendingCry = { x: this.x, z: this.z };
+        }
+        if (this.stateT >= this.totalT() + 0.3) { this.state = "drawn"; this.stateT = 0; }
         break;
       }
       case "stagger": {
         pose = { ...STAGGERP };
         pose.torso += rad(noise1(t * 6 + this.seed) * 3);
+        if (this.sprawled) { pose.pelvisY = 30; pose.bodyRot = rad(34); } // face-down in the grass
         rate = 14;
         if (this.stateT > 2.2) {
           this.state = "drawn"; this.stateT = 0;
-          this.posture = 1; // it gathers itself, barely — the quieting was the answer
+          // a true break barely knits; a sprawl is embarrassment, not damage
+          if (!this.sprawled) this.posture = 1;
+          this.sprawled = false;
         }
         break;
       }
       case "stalled": {
-        // ink caught mid-stroke by the hush — held wrong, trembling
+        // ink caught mid-stroke by the hush — held wrong, trembling.
+        // THE REMEMBERED kneels instead: it has been corrected before, long ago (§21).
         pose = sampleTimeline(ATTACK, ATK_STRIKE_T * 0.85);
         pose = { ...pose };
-        pose.torso += rad(noise1(t * 11 + this.seed) * 1.6);
-        rate = 20;
-        if (this.stateT > 1.6) { this.state = "stagger"; this.stateT = 0.4; }
+        if (this.def.drill) {
+          pose.pelvisY = 36; pose.torso += rad(16); pose.head += rad(20);
+          pose.sword = rad(-80); // the blade lowered — grief, not stun
+          rate = 10;
+        } else {
+          pose.torso += rad(noise1(t * 11 + this.seed) * 1.6);
+          rate = 20;
+        }
+        if (this.stateT > (this.def.drill ? 2.6 : 1.6)) { this.state = "stagger"; this.stateT = this.def.drill ? 1.2 : 0.4; }
         break;
       }
       case "quieted": {
@@ -250,6 +387,13 @@ export class Shade {
     p.pelvisY = 62 + Math.sin(ph * 2) * 1.8;
     p.torso = rad(26 + Math.sin(ph * 2 + this.seed) * 2);
     p.head = rad(18 + noise1(t * 0.7 + this.seed) * 6);
+    if (this.def.drill) {
+      // THE REMEMBERED stands the way the stair statues kneel — keeper drill (§21)
+      p.pelvisY = 68; p.torso = rad(6 + Math.sin(ph * 2) * 1);
+      p.head = rad(2 + noise1(t * 0.5 + this.seed) * 2);
+      p.sword = rad(-42); // the blade carried before the chest, not dragged
+      p.shR = rad(28); p.elR = rad(24);
+    }
     const stride = 24, lift = 8;
     const foot = (phase: number): [number, number] => [
       Math.cos(phase) * stride,
@@ -309,7 +453,7 @@ export class Shade {
       return;
     }
     const p = this.compute();
-    const s = this.zScale();
+    const s = this.zScale() * this.def.scale; // the Burdened is MASS; the Startled is a whisper
     ctx.save();
     ctx.translate(this.x, this.groundY());
     ctx.scale(this.facing * s, s);
@@ -324,21 +468,54 @@ export class Shade {
     ctx.globalAlpha = 1;
     if (this.poolA > 0.01) { ctx.restore(); this.drawPool(ctx); ctx.save(); ctx.translate(this.x, this.groundY()); ctx.scale(this.facing * s, s); }
 
-    const agitated = this.threatening ? 1 : 0.35;
+    // the Remembered's ink holds its shape — it remembers being corrected (§21)
+    const agitated = (this.threatening ? 1 : 0.35) * (this.def.drill ? 0.5 : 1);
     const INK = "#0a0714", PLATE = "#141019";
     const SEAM = this.hitFlash > 0 ? "#7a2c3a" : "#3d1622";
+    const wm = this.def.lunges ? 0.72 : 1; // the Startled: too many elbows, too little ink
+
+    // THE BURDENED: the bound bell rides its back — the silhouette IS the burden (§21)
+    if (this.kind === "burdened") {
+      ctx.fillStyle = "#100d13";
+      ctx.beginPath();
+      ctx.ellipse(p.pel[0] - 26, (p.pel[1] + p.neck[1]) / 2 - 6, 20, 26, -0.18, 0, TAU);
+      ctx.fill();
+      // felt wrap + cords — the Bellbinder's undone work, still holding
+      ctx.strokeStyle = "#241a14";
+      ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(p.pel[0] - 42, p.pel[1] - 18); ctx.lineTo(p.neck[0] + 4, p.neck[1] + 6); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(p.pel[0] - 40, p.pel[1] - 2); ctx.lineTo(p.pel[0] + 8, p.pel[1] - 8); ctx.stroke();
+      // the mute mouth, downward — it must never touch ground
+      ctx.fillStyle = "#060409";
+      ctx.beginPath();
+      ctx.ellipse(p.pel[0] - 26, (p.pel[1] + p.neck[1]) / 2 + 18, 13, 4.5, -0.1, 0, TAU);
+      ctx.fill();
+    }
 
     // limbs as unstable ink
-    this.inkLimb(ctx, p.shF, p.elbF, 8, 6.5, INK, t, 1, agitated);
-    this.inkLimb(ctx, p.elbF, p.hndF, 6.5, 5.5, INK, t, 2, agitated);
-    this.inkLimb(ctx, p.hipF, p.kneF, 10, 8.5, INK, t, 3, agitated);
-    this.inkLimb(ctx, p.kneF, p.ftF, 8.5, 6, INK, t, 4, agitated);
+    this.inkLimb(ctx, p.shF, p.elbF, 8 * wm, 6.5 * wm, INK, t, 1, agitated);
+    this.inkLimb(ctx, p.elbF, p.hndF, 6.5 * wm, 5.5 * wm, INK, t, 2, agitated);
+    this.inkLimb(ctx, p.hipF, p.kneF, 10 * wm, 8.5 * wm, INK, t, 3, agitated);
+    this.inkLimb(ctx, p.kneF, p.ftF, 8.5 * wm, 6 * wm, INK, t, 4, agitated);
 
     // torso plate (Loud Age slab) + dents
     this.plate(ctx, p.pel, p.neck, PLATE, SEAM, t, agitated);
 
-    this.inkLimb(ctx, p.hipN, p.kneN, 10.5, 9, INK, t, 5, agitated);
-    this.inkLimb(ctx, p.kneN, p.ftN, 9, 6.5, INK, t, 6, agitated);
+    // THE SEALED: plate fused into a tower wall on the face it holds (§21).
+    // No gaps forward — the seam is behind it, and the band walks around walls.
+    if (this.kind === "sealed") {
+      ctx.fillStyle = PLATE;
+      ctx.beginPath();
+      ctx.moveTo(16, 6); ctx.lineTo(30, -2); ctx.lineTo(32, -104); ctx.lineTo(20, -116); ctx.lineTo(14, -108);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = SEAM;
+      ctx.globalAlpha = 0.4;
+      ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.moveTo(22, -12); ctx.lineTo(24, -98); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
+    this.inkLimb(ctx, p.hipN, p.kneN, 10.5 * wm, 9 * wm, INK, t, 5, agitated);
+    this.inkLimb(ctx, p.kneN, p.ftN, 9 * wm, 6.5 * wm, INK, t, 6, agitated);
 
     // head: a great helm long empty — ink coils where the face was
     const ha = Math.atan2(p.headC[0] - p.neck[0], -(p.headC[1] - p.neck[1]));
@@ -363,12 +540,26 @@ export class Shade {
     ctx.beginPath();
     ctx.moveTo(-4, 0); ctx.lineTo(-5 - noise1(t * 1.8 + this.seed) * 2, 9 + noise1(t * 1.3 + this.seed) * 3);
     ctx.stroke();
+    // THE CRIER: the jaw unhinges as the wail leaves — the helm opens WRONG (§21)
+    if (this.kind === "crier" && this.state === "cry") {
+      const u = Math.min(1, this.stateT / this.strikeT());
+      ctx.fillStyle = PLATE;
+      ctx.beginPath();
+      ctx.moveTo(-8, 10); ctx.lineTo(8, 10);
+      ctx.lineTo(10, 10 + 14 * u); ctx.lineTo(-6, 10 + 16 * u);
+      ctx.closePath(); ctx.fill();
+      ctx.strokeStyle = SEAM;
+      ctx.globalAlpha = 0.5 + 0.4 * u;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(-5, 9); ctx.lineTo(-4, 10 + 15 * u); ctx.stroke();
+      ctx.globalAlpha = 1;
+    }
     ctx.globalAlpha = 1;
     ctx.restore();
 
     // near arm + the dragged blade (ink-caked steel; a smear when it moves fast)
-    this.inkLimb(ctx, p.shN, p.elbN, 8.5, 7, INK, t, 7, agitated);
-    this.inkLimb(ctx, p.elbN, p.hndN, 7, 6, INK, t, 8, agitated);
+    this.inkLimb(ctx, p.shN, p.elbN, 8.5 * wm, 7 * wm, INK, t, 7, agitated);
+    this.inkLimb(ctx, p.elbN, p.hndN, 7 * wm, 6 * wm, INK, t, 8, agitated);
     const bd = Math.hypot(p.tip[0] - p.guard[0], p.tip[1] - p.guard[1]) || 1;
     const bnx = -(p.tip[1] - p.guard[1]) / bd, bny = (p.tip[0] - p.guard[0]) / bd;
     ctx.fillStyle = "#100c18";
@@ -484,9 +675,11 @@ export class Shade {
   }
 }
 
-// authored, sparse encounters (BRIEF §7.7) — the journey is the game
-export const SHADE_SPAWNS: Record<number, number[]> = {
-  1: [1900],       // one lone teacher before the dusk exit
-  2: [1300, 1660], // two singles spaced along the road to the fire
-  4: [1310, 1530], // the stair's pair — the co-op formation moment
+// authored, sparse encounters (BRIEF §7.7) — the journey is the game.
+// §21 placements: each chapter introduces at most ONE new lesson.
+export const SHADE_SPAWNS: Record<number, { x: number; k: ShadeKind }[]> = {
+  1: [{ x: 1900, k: "stirred" }],                            // the lone teacher
+  2: [{ x: 1360, k: "sealed" }, { x: 1680, k: "stirred" }],  // the wall holds the road to the fire
+  3: [{ x: 1180, k: "startled" }, { x: 1520, k: "crier" }],  // the vista ambush: speed, then noise
+  4: [{ x: 1310, k: "burdened" }, { x: 1530, k: "remembered" }], // the stair's pair — mass + the drill
 };
