@@ -45,7 +45,7 @@ animation-first (GEEKED/RIFT WARDEN died ignoring it) · banned list absolute._
   palette check (4b) · stagger posture-knit tuning after pad feel.
 
 ## Phase 3 — THE FIRST AWAKE
-- [~] 3a. Reveal machinery ✅ WORKING / standing FORM ⟵ OPEN BOARD ITEM (docs/awake/)
+- [x] 3a. THE REVEAL ✅ BOARD-PASSED 2026-07-12 (proof docs/awake/, esp. 08-the-ward = the poster)
   Built: src/awake.ts — statue mode = EXACT live replica of the board-passed bake (seed 541, drawn
   between plate layers 3/4 so the field buries his knees, breathing with the Ember); buried-floor
   tolls (walk/sprint strides + rolls/strikes ring it, fx.tollRing snow-blooms); 2 tolls → LISTEN
@@ -53,13 +53,19 @@ animation-first (GEEKED/RIFT WARDEN died ignoring it) · banned list absolute._
   (5 beats: stand-hold-stand-hold-stand, ~8.6s; wheels west DURING the first standing; snow-shed
   covers the statue→rig swap); WARD (palm-down off-hand: *quiet. stay.*); re-kneels if the field
   empties. Camera locks wide (0.74) through the drama. 165fps all scenes (perf-probe).
-  **BOARD FAIL to fix next: the standing/mid-rise FORM** — reads as black egg → monolith with a
-  fire-ruff: pelt dabs clump at the crest (re-pin across the whole back edge, darken), horns dangle
-  as tubes mid-morph (author wider, keep them wrapping the head through the whole rise), STAND_W
-  path needs a real muzzle jut + neck-vs-hump separation + leg reads, ward arm too thin (16px on a
-  660px body). Also s5Ground hummock dabs scatter as pancakes at 0.74 zoom (soften).
-  Use a static-pose harness (draw STAND_W directly, iterate the path fast) before re-running the
-  reveal. Then: 3b Watch/shockwaves/hour-toll · 3c Fear/Memory/he-waits · death kneel + quieter world.
+  Form iterations (board): 21-point shared contour so legs EMERGE from the drift as the gap opens
+  upward; head low-slung in front of the mountain hump w/ boxy muzzle; horns wrap DOWN around the
+  face; pelt = ONE wind-stripped flank patch + strays (never confetti); wax drips hang down the
+  east slope inside the crest; ward arm = real two-segment mass + garland on the warding wrist;
+  gripped clapper dragged east w/ ember-rimmed west edge (64px triad: hunch+horns+dragged line).
+  Static harness scripts/awake-pose.mjs (__somnium.awakePose) for fast pose iteration.
+- [ ] 3b. THE WATCH: warning arcs, clapper shockwaves (snow-bloom rings), the mid-fight hour-toll
+  he refuses to skip; threshold = pressing past him; never pursues beyond the buried floor.
+- [ ] 3c. THE FEAR (red deepens, horizontal snow, down-horns lead) + THE MEMORY (keeper's staff-drill;
+  **if a knight falls he WAITS**) + death kneel (plants clapper, kneels, greys — the stair statues
+  were never statues) + the world grows quieter + "the watch is kept."
+  Notes: mid-rise horn morph slightly tubes (motion covers; check in 4b capture) · s5Ground hummocks
+  scatter as pancakes at 0.74 zoom (soften in 4b) · journey full-0X stills mistimed vs scenes (fix script).
 
 ## Phase 4 — Polish
 - [ ] 4a. Audio: lullaby (unresolved until epilogue), toll accelerando, per-scene beds, ringing blade, scored silences

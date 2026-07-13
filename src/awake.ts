@@ -16,9 +16,12 @@ export const AWAKE_BASE = 1006;   // the snowfield dips below the play plane her
 export const FLOOR_L = 1150, FLOOR_R = 1850; // the buried bronze floor (the threshold)
 const S = 4.0;
 
-// ---- silhouettes: 7-anchor closed paths (p0 · 5×[ctrl,anchor] · p6), S units, y UP ----
+// ---- silhouettes: 21-point closed contours (p0 · 10×[ctrl,anchor]), S units, y UP.
+// Both poses share the point count so the rise is a clean morph. The kneel keeps
+// degenerate ground points where the stand opens a gap between the legs — so the
+// legs EMERGE from the drift as he rises, the gap growing upward out of the snow.
 type Pt = [number, number];
-type Path7 = Pt[]; // [p0, c1,a1, c2,a2, c3,a3, c4,a4, c5,a5, p6] — 12 points
+type Path7 = Pt[];
 
 // kneeling, head EAST toward the bell he keeps (matches the Phase-1 bake)
 const KNEEL_E: Path7 = [
@@ -28,7 +31,11 @@ const KNEEL_E: Path7 = [
   [22, 60], [26, 44],
   [34, 36], [30, 26],
   [26, 16], [18, 12],
-  [16, 0],
+  [17, 8], [16, 4],
+  [16, 2], [16, 0],
+  [10, 0], [4, 0],
+  [-2, 0], [-8, 0],
+  [-14, 0], [-18, 0],
 ];
 // kneeling, head turned WEST over the shoulder — the moment he has heard them
 const KNEEL_W: Path7 = [
@@ -38,17 +45,26 @@ const KNEEL_W: Path7 = [
   [10, 62], [2, 52],
   [-8, 46], [-14, 36],
   [-10, 24], [-2, 18],
-  [16, 0],
+  [4, 12], [10, 6],
+  [14, 3], [16, 0],
+  [10, 0], [4, 0],
+  [-2, 0], [-8, 0],
+  [-14, 0], [-18, 0],
 ];
-// standing: mountain-shouldered hunch, head low-slung in front, horns down. ~150 S tall.
+// standing: mountain-shouldered hunch, head LOW-SLUNG in front of the hump,
+// boxy muzzle jut, long back slope, two pillar legs with open sky between. ~152 S.
 const STAND_W: Path7 = [
-  [-22, 0],
-  [-30, 45], [-28, 78],
-  [-44, 86], [-38, 96],
-  [-30, 116], [-12, 138],
-  [4, 154], [18, 130],
-  [30, 90], [28, 48],
-  [20, 0],
+  [-20, 0],
+  [-26, 30], [-24, 62],
+  [-30, 78], [-28, 92],
+  [-46, 94], [-42, 108],
+  [-30, 124], [-14, 138],
+  [2, 152], [14, 144],
+  [26, 120], [26, 78],
+  [28, 46], [22, 28],
+  [18, 12], [14, 0],
+  [10, 26], [0, 30],
+  [-8, 28], [-12, 0],
 ];
 
 // horns sweep DOWN (he lowers his head to LISTEN): per-pose [start, ctrl, end] ×2
@@ -62,11 +78,11 @@ const HORNS_KW: Horn[] = [
   [[-2, 44], [14, 50], [22, 44]],
 ];
 const HORNS_SW: Horn[] = [
-  [[-36, 100], [-56, 94], [-58, 74]],
-  [[-28, 110], [-12, 118], [-4, 112]],
+  [[-16, 128], [-40, 132], [-48, 104]],
+  [[-4, 134], [16, 138], [24, 122]],
 ];
-// ear anchor (the first thing that moves) + muzzle tip per pose
-const EAR_E: Pt = [22, 42]; const EAR_KW: Pt = [-2, 50]; const EAR_SW: Pt = [-26, 114];
+// ear anchor (the first thing that moves) per pose
+const EAR_E: Pt = [22, 42]; const EAR_KW: Pt = [-2, 50]; const EAR_SW: Pt = [-8, 132];
 
 function lerpPath(a: Path7, b: Path7, u: number): Path7 {
   return a.map((p, i) => [lerp(p[0], b[i][0], u), lerp(p[1], b[i][1], u)] as Pt);
@@ -108,17 +124,32 @@ export class FirstAwake {
   private pelt: { i: number; j: number; f: number; ox: number; oy: number; w: number; h: number; rot: number; c: string }[] = [];
 
   constructor() {
-    const anchors = [2, 4, 6, 8]; // haunch→hump→neck region indices into Path7
+    // ONE wind-stripped flank patch (the bake's law: many-and-weak, clustered) +
+    // a few strays — never confetti
     for (let k = 0; k < 44; k++) {
-      const i = anchors[(this.R() * anchors.length) | 0];
+      const stray = this.R() > 0.75;
+      const [i, j] = stray
+        ? ([[2, 4], [12, 14], [10, 12]] as [number, number][])[(this.R() * 3) | 0]
+        : [4, 12] as [number, number]; // chest→mid-back: the flank
       this.pelt.push({
-        i, j: i === 8 ? 6 : i + 2, f: this.R(),
-        ox: (this.R() - 0.5) * 10, oy: -(this.R() * 14),
-        w: (3 + this.R() * 6) * 0.4, h: (5 + this.R() * 9) * 0.4,
+        i, j, f: stray ? this.R() : 0.3 + this.R() * 0.45,
+        ox: (this.R() - 0.5) * 7, oy: -(this.R() * 8),
+        w: (4 + this.R() * 6) * 0.35, h: (6 + this.R() * 9) * 0.35,
         rot: (this.R() - 0.5) * 0.5,
         c: this.R() < 0.6 ? "#4a1410" : "#5e1a12",
       });
     }
+  }
+
+  // QA-only: freeze the boss at a given rise for the pose harness
+  debugFreeze = false;
+  debugPose(r: number) {
+    this.debugFreeze = true;
+    this.rise = clamp(r, 0, 1);
+    this.headTurn = this.rise > 0 ? clamp(this.rise / 0.15, 0, 1) : 0;
+    this.state = r >= 1 ? "ward" : r > 0 ? "rise" : "statue";
+    this.stateT = 3;
+    this.shed = true;
   }
 
   get dramatic() { return this.state === "listen" || this.state === "rise" || this.state === "ward"; }
@@ -139,6 +170,7 @@ export class FirstAwake {
   }
 
   update(dt: number, t: number, nearestKnightX: number | null, anyOnFloor: boolean, fx: Fx) {
+    if (this.debugFreeze) return;
     this.stateT += dt;
     this.earFlick = Math.max(0, this.earFlick - dt * 2.2);
 
@@ -294,35 +326,20 @@ export class FirstAwake {
     const W = (p: Pt): Pt => [p[0] * S, -p[1] * S];
 
     // the body — the only warm-dark mountain in the blue-white
-    ctx.fillStyle = "#0f0b0e";
+    ctx.fillStyle = "#140a0c"; // black pelt with the heart's red in it
     ctx.beginPath();
     const pts = path.map(W);
     ctx.moveTo(pts[0][0], pts[0][1]);
     for (let i = 1; i + 1 < pts.length; i += 2) {
       ctx.quadraticCurveTo(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1]);
     }
-    ctx.lineTo(pts[11][0], pts[11][1]);
     ctx.closePath();
     ctx.fill();
-
-    // standing: leg separations painted INTO the mass (pelt curtain, not anatomy)
-    if (u > 0.25) {
-      ctx.strokeStyle = "#070509";
-      ctx.globalAlpha = 0.7 * clamp((u - 0.25) / 0.5, 0, 1);
-      ctx.lineWidth = 3.5;
-      for (const lx of [-9, 8]) {
-        ctx.beginPath();
-        ctx.moveTo(lx * S, 0);
-        ctx.quadraticCurveTo((lx + 2) * S, -34 * S * u, (lx + 4) * S, -52 * S * u);
-        ctx.stroke();
-      }
-      ctx.globalAlpha = 1;
-    }
 
     // horns — down-swept; he lowers his head to listen
     ctx.strokeStyle = "#151018";
     ctx.lineCap = "round";
-    ctx.lineWidth = 6.5 * S * 0.5;
+    ctx.lineWidth = 6.5 * S * 0.7;
     for (const h of horns) {
       const [a, c, b] = h.map(W);
       ctx.beginPath();
@@ -344,7 +361,7 @@ export class FirstAwake {
     ctx.fill();
     ctx.restore();
 
-    // pelt dabs riding the morph
+    // pelt dabs riding the morph — the flank wind-stripped to the heart's red
     for (const d of this.pelt) {
       const a = pts[d.i], b = pts[d.j];
       const px = lerp(a[0], b[0], d.f) + d.ox * S * 0.4;
@@ -353,7 +370,7 @@ export class FirstAwake {
       ctx.translate(px, py);
       ctx.rotate(d.rot);
       ctx.fillStyle = d.c;
-      ctx.globalAlpha = 0.62;
+      ctx.globalAlpha = 0.5;
       ctx.beginPath();
       ctx.ellipse(0, 0, d.w * S, d.h * S, 0, 0, TAU);
       ctx.fill();
@@ -361,14 +378,17 @@ export class FirstAwake {
     }
     ctx.globalAlpha = 1;
 
-    // wax strata (generations of keepers anointed him) — pale drips off the hump
-    const humpTop = pts[7];
+    // wax strata (generations of keepers anointed him) — drips hanging DOWN the
+    // east shoulder slope, inside the silhouette, never breaking the crest line
+    const humpTop = pts[10], slope = pts[12];
     for (let i = 0; i < 6; i++) {
-      const wx = humpTop[0] + (i - 2.5) * 3.4 * S * 0.8;
+      const f = 0.15 + (i / 6) * 0.6;
+      const wx = lerp(humpTop[0], slope[0], f);
+      const wy = lerp(humpTop[1], slope[1], f) + (8 + (i % 3) * 5) * S * 0.5;
       ctx.fillStyle = "#8a7a62";
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.45;
       ctx.beginPath();
-      ctx.ellipse(wx, humpTop[1] + (10 + (i % 3) * 6) * S * 0.5, 1.6 * S * 0.5, (5 + (i * 7) % 8) * S * 0.5, 0.05, 0, TAU);
+      ctx.ellipse(wx, wy, 1.6 * S * 0.5, (5 + (i * 7) % 8) * S * 0.5, 0.05, 0, TAU);
       ctx.fill();
     }
     ctx.globalAlpha = 1;
@@ -391,14 +411,25 @@ export class FirstAwake {
       ctx.globalAlpha = 1;
     }
     if (grip != null && grip > 0) {
-      // in his fist: dragged low at his side, tip resting in the trench it carved
-      const hx = lerp(-30, -26, grip) * S, hy = lerp(-40, -86, grip) * S;
-      const tx = lerp(-34, -62, grip) * S, ty = lerp(-58 * S, -6, grip * grip);
+      // in his fist: dragged low behind him, tip deepening the 400-year trench
+      const hx = lerp(-30, 20, grip) * S, hy = -lerp(40, 56, grip) * S;
+      const tx = lerp(-34, 38, grip) * S, ty = -lerp(58, 1, grip) * S;
       ctx.globalAlpha = grip;
       ctx.beginPath();
       ctx.moveTo(hx, hy);
       ctx.lineTo(tx, ty);
       ctx.stroke();
+      // the Ember finds its west edge — the dragged line must read at 64px (§5)
+      ctx.strokeStyle = "#7e2418";
+      ctx.globalAlpha = grip * 0.55;
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.moveTo(hx - 4, hy);
+      ctx.lineTo(tx - 4, ty);
+      ctx.stroke();
+      ctx.strokeStyle = "#0a0c11";
+      ctx.lineWidth = 11;
+      ctx.globalAlpha = grip;
       ctx.fillStyle = "#0a0c11";
       ctx.beginPath(); ctx.ellipse(tx, ty, 4.5 * S * 0.55, 5 * S * 0.4, 0.2, 0, TAU); ctx.fill();
       ctx.globalAlpha = 1;
@@ -420,20 +451,34 @@ export class FirstAwake {
     // THE WARD — palm-down with the off-hand: *quiet. stay.* (he is still a keeper)
     if (this.state === "ward" || (this.state === "rise" && this.rise > 0.9)) {
       const wa = this.state === "ward" ? clamp(this.stateT / 1.4, 0, 1) : 0.2;
-      const sh = pts[6]; // neck-base anchor
-      const ex = sh[0] - 34 * S * wa, ey = sh[1] + 26 * S * wa;
-      ctx.strokeStyle = "#0f0b0e";
-      ctx.lineWidth = 8 * S * 0.5;
+      // a real arm with mass: shoulder under the muzzle, elbow, flat-held palm
+      const sh: Pt = [-20 * S, -92 * S];
+      const el: Pt = [lerp(-22, -34, wa) * S, lerp(-80, -76, wa) * S];
+      const hd: Pt = [lerp(-22, -46, wa) * S, lerp(-68, -62, wa) * S];
+      ctx.strokeStyle = "#140a0c";
       ctx.lineCap = "round";
+      ctx.lineWidth = 6.5 * S;
       ctx.beginPath();
-      ctx.moveTo(sh[0] - 4 * S, sh[1] + 8 * S);
-      ctx.quadraticCurveTo(sh[0] - 18 * S * wa, sh[1] + 10 * S, ex, ey);
+      ctx.moveTo(sh[0], sh[1]);
+      ctx.lineTo(el[0], el[1]);
+      ctx.stroke();
+      ctx.lineWidth = 5 * S;
+      ctx.beginPath();
+      ctx.moveTo(el[0], el[1]);
+      ctx.lineTo(hd[0], hd[1]);
       ctx.stroke();
       // the palm, held flat over the earth
-      ctx.fillStyle = "#0f0b0e";
+      ctx.fillStyle = "#140a0c";
       ctx.beginPath();
-      ctx.ellipse(ex - 3 * S * wa, ey + 1.5 * S, 5.5 * S * 0.6, 2.2 * S * 0.6, 0.1, 0, TAU);
+      ctx.ellipse(hd[0] - 3 * S * wa, hd[1] + 1.5 * S, 6.5 * S * 0.6, 2.4 * S * 0.6, 0.1, 0, TAU);
       ctx.fill();
+      // garland on THIS wrist too — the warding hand wears their love
+      ctx.fillStyle = "#5a5040";
+      ctx.globalAlpha = 0.7 * wa;
+      ctx.beginPath();
+      ctx.ellipse(hd[0] + 2 * S, hd[1] - 1 * S, 3.4 * S * 0.6, 1.6 * S * 0.6, 0.2, 0, TAU);
+      ctx.fill();
+      ctx.globalAlpha = 1;
     }
 
     // drift piled where he knelt (stays — the field remembers his shape)

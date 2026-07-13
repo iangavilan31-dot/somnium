@@ -140,6 +140,7 @@ declare global {
       slow: (f: number) => void; sx: (p2?: boolean) => number;
       shades: () => string;
       awake: () => string;
+      awakePose: (r: number) => void;
     };
   }
 }
@@ -185,6 +186,7 @@ window.__somnium = {
   },
   shades: () => shades.map((s) => `${s.state}@${Math.round(s.x)}p${s.posture}d${s.dents}`).join("|"),
   awake: () => (awake ? `${awake.state} t${awake.tolls}` : "none"),
+  awakePose: (r: number) => awake?.debugPose(r),
 };
 
 const perf: Perf = { fps: 60, simMs: 0, renderMs: 0 };
