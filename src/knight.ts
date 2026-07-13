@@ -4,7 +4,7 @@
 // every move declares impact + cancel window in the MOVES table, never fudged.
 
 import { clamp, damp, easeInCubic, easeInOutCubic, easeOutCubic, lerp, noise1, rad, TAU, type Ease } from "./math";
-import { GROUND_Y } from "./paint";
+import { BAND_FAR, BAND_NEAR, DEPTH_SPEED, GROUND_Y, Z_SCALE, Z_SLOPE, Z_TOL } from "./paint";
 import type { Fx } from "./fx";
 
 // ---- proportions (world px) ----
@@ -336,7 +336,7 @@ export type KnightState =
 
 // what a player (or the QA harness) asks of the knight this frame
 export interface Intents {
-  axis: number; sprint: boolean;
+  axis: number; axisZ: number; sprint: boolean;
   attackTap: boolean;
   heavyTap: boolean; heavyHeld: boolean;
   roll: boolean;
@@ -344,7 +344,7 @@ export interface Intents {
   parryTap: boolean;
 }
 export const NO_INTENT: Intents = {
-  axis: 0, sprint: false, attackTap: false,
+  axis: 0, axisZ: 0, sprint: false, attackTap: false,
   heavyTap: false, heavyHeld: false, roll: false,
   guardHeld: false, parryTap: false,
 };
@@ -360,12 +360,14 @@ const WALK_SPEED = 150, SPRINT_SPEED = 268, CRAWL_SPEED = 26, GUARD_SHUFFLE = 40
 
 export class Knight {
   x: number; facing = 1;
+  z = 0;                         // depth in the band (M&C §18); +z toward the reader
   state: KnightState = "prelude";
   stateT = 0;
   cur: Pose = { ...LYING };
   walkPhase = 0;
   vx = 0; // knockback impulse velocity
   boundsL = 320; boundsR = 2100; // set per scene by the journey
+  bandN = BAND_NEAR; bandF = BAND_FAR; // the scene's designed depth band
   lightX = 1150;                 // key-light x — shadows point away (set per scene)
   wounds = 0;                    // 3 = collapse; read as breath + stance, never a bar
   reviveT = 0;                   // filled by a partner's embrace
@@ -379,6 +381,8 @@ export class Knight {
   private chainBuf = 0;          // buffered attack tap (s remaining)
   private rollBuf = 0;           // buffered roll tap
   private rollAxisBuf = 0;       // direction held AT the tap (intent fidelity)
+  private rollAxisZBuf = 0;      // depth held at the tap — the circling verb (§18)
+  private depthMoveT = 0;        // recently walking the band → hurt z-band narrows
   private heavyCharge = 0;       // 0..1 at release
   private parryHold = 0;         // the held breath after a catch
   private guardJolt = 0;         // chip-jolt timer while guarding
@@ -386,7 +390,9 @@ export class Knight {
   private crawlPhase = 0;
   private soloDownT = 0;         // provisional: solo knights rally after a while
   private moveX0 = 0;            // scripted displacement origin (roll/backstep)
-  private moveDir = 1;
+  private moveZ0 = 0;
+  private moveDir = 1;           // x-component of the scripted direction (normalized)
+  private moveDirZ = 0;          // z-component — a roll can circle (§18)
   private tNow = 0;
   hitFlash = 0;
   wakeDone = false;
@@ -402,10 +408,16 @@ export class Knight {
     this.state = "wake"; this.stateT = 0; this.wakeDone = false;
   }
   resetToLying(x: number) {
-    this.x = x; this.facing = 1; this.state = "prelude"; this.stateT = 0;
+    this.x = x; this.z = 0; this.facing = 1; this.state = "prelude"; this.stateT = 0;
     this.cur = { ...LYING }; this.vx = 0; this.wakeDone = false;
     this.wounds = 0; this.reviveT = 0; this.act = null;
   }
+
+  // ---- the depth band (M&C §18) ----
+  groundY() { return GROUND_Y + this.z * Z_SLOPE; }
+  zScale() { return 1 + this.z * Z_SCALE; }
+  // generous to hit, honest to dodge: the hurt band narrows while walking the band
+  hurtZ() { return this.depthMoveT > 0 ? 15 : 24; }
 
   // ---- state queries ----
   get sitting() { return this.state === "sit"; }
@@ -428,24 +440,32 @@ export class Knight {
     this.actFired = false; this.chainBuf = 0; this.heavyCharge = charge;
     this.noise = m.loud; this.noiseT = this.tNow;
   }
-  private startRollOrBackstep(axisNow: number, fx: Fx) {
+  private startRollOrBackstep(axisNow: number, axisZNow: number, fx: Fx) {
     this.rollBuf = 0;
     // the direction held at the TAP wins; the stick's current whisper is the fallback
-    const axis = Math.abs(this.rollAxisBuf) > 0.2 ? this.rollAxisBuf : axisNow;
-    this.rollAxisBuf = 0;
-    if (Math.abs(axis) > 0.2) {
-      this.facing = axis > 0 ? 1 : -1;
+    const buffered = Math.hypot(this.rollAxisBuf, this.rollAxisZBuf) > 0.2;
+    const ax = buffered ? this.rollAxisBuf : axisNow;
+    const az = buffered ? this.rollAxisZBuf : axisZNow;
+    this.rollAxisBuf = 0; this.rollAxisZBuf = 0;
+    const mag = Math.hypot(ax, az);
+    if (mag > 0.2) {
+      // the circling verb: the roll aims along the held vector, same fixed distance,
+      // same honest i-frames — depth costs nothing and hides nothing (§18)
+      if (Math.abs(ax) > 0.2) this.facing = ax > 0 ? 1 : -1;
       this.state = "roll"; this.stateT = 0;
-      this.moveX0 = this.x; this.moveDir = this.facing;
+      this.moveX0 = this.x; this.moveZ0 = this.z;
+      this.moveDir = ax / mag; this.moveDirZ = az / mag;
       this.noise = 2.5; this.noiseT = this.tNow;
       // the cloak wraps into the tumble
-      for (const n of this.cloak) { n.px = n.x = lerp(n.x, this.x, 0.55); n.py = n.y = lerp(n.y, GROUND_Y - 40, 0.4); }
-      fx.dust(this.x, GROUND_Y - 2, 4, -this.facing * 0.5);
+      for (const n of this.cloak) { n.px = n.x = lerp(n.x, this.x, 0.55); n.py = n.y = lerp(n.y, this.groundY() - 40, 0.4); }
+      fx.dust(this.x, this.groundY() - 2, 4, -this.facing * 0.5);
     } else {
+      // backstep stays pure retreat along the blade line — the 1D spacing verb
       this.state = "backstep"; this.stateT = 0;
-      this.moveX0 = this.x; this.moveDir = -this.facing;
+      this.moveX0 = this.x; this.moveZ0 = this.z;
+      this.moveDir = -this.facing; this.moveDirZ = 0;
       this.noise = 2; this.noiseT = this.tNow;
-      fx.dust(this.x + this.facing * 6, GROUND_Y - 2, 3, this.facing * 0.6);
+      fx.dust(this.x + this.facing * 6, this.groundY() - 2, 3, this.facing * 0.6);
     }
   }
   startQuieting(): boolean {
@@ -505,14 +525,17 @@ export class Knight {
       this.vx = -this.facing * 90;
       this.guardJolt = 0.12;
       this.hitFlash = 0.06;
-      fx.dust(this.x + this.facing * 24, GROUND_Y - 34, 3, this.facing * 0.4);
+      fx.dust(this.x + this.facing * 24, this.groundY() - 34, 3, this.facing * 0.4);
       return "blocked";
     }
     this.wounds++;
     this.hitFlash = 0.14;
     this.vx = -this.facing * 240;
+    // §19 buffer honesty: a landed hit CLEARS every buffered intent —
+    // no roll from beyond the grave (the Elden Ring lesson, research canon)
+    this.chainBuf = 0; this.rollBuf = 0; this.rollAxisBuf = 0; this.rollAxisZBuf = 0;
     for (const n of this.cloak) { n.px -= this.facing * 7; } // whip
-    fx.dust(this.x, GROUND_Y - 2, 6, -this.facing);
+    fx.dust(this.x, this.groundY() - 2, 6, -this.facing);
     if (this.wounds >= 3) {
       this.state = "collapse"; this.stateT = 0; this.soloDownT = 0;
       return "downed";
@@ -530,12 +553,12 @@ export class Knight {
     this.chainBuf = Math.max(0, this.chainBuf - dt);
     this.rollBuf = Math.max(0, this.rollBuf - dt);
     if (ii.attackTap) this.chainBuf = 0.18;
-    if (ii.roll) { this.rollBuf = 0.15; this.rollAxisBuf = ii.axis; }
+    if (ii.roll) { this.rollBuf = 0.15; this.rollAxisBuf = ii.axis; this.rollAxisZBuf = ii.axisZ; }
 
     // ---- verb starts from mobile/guard states ----
     if (this.mobile() || this.state === "guard") {
       if (this.rollBuf > 0) {
-        this.startRollOrBackstep(ii.axis, fx);
+        this.startRollOrBackstep(ii.axis, ii.axisZ, fx);
       } else if (ii.heavyTap && this.state !== "guard") {
         this.state = "charge"; this.stateT = 0;
         // facing locks toward the stick if it speaks, else stays
@@ -552,35 +575,45 @@ export class Knight {
     }
 
     // ---- locomotion (walk / sprint / guard shuffle; moving stands a sitter up) ----
+    // §18: movement is a vector across the band; facing only ever comes from x —
+    // the knights are side-view creatures, walking the band never flips them
+    const moveMag = Math.hypot(ii.axis, ii.axisZ);
+    const inv = moveMag > 1 ? 1 / moveMag : 1; // diagonals honest, cardinal speeds kept
     if (this.mobile()) {
-      if (Math.abs(ii.axis) > 0.2) {
+      if (moveMag > 0.2) {
         const wantSprint = ii.sprint;
         if (wantSprint && this.state !== "sprint") { this.state = "sprint"; this.stateT = 0; this.sprintT = 0; this.noise = 2; this.noiseT = t; }
-        if (!wantSprint && this.state === "sprint") { this.state = "skid"; this.stateT = 0; fx.dust(this.x, GROUND_Y - 2, 6, this.facing); }
+        if (!wantSprint && this.state === "sprint") { this.state = "skid"; this.stateT = 0; fx.dust(this.x, this.groundY() - 2, 6, this.facing); }
         if (this.state !== "skid") {
           if (this.state !== "sprint") this.state = "walk";
-          this.facing = ii.axis > 0 ? 1 : -1;
-          let speed = WALK_SPEED * Math.abs(ii.axis);
+          if (Math.abs(ii.axis) > 0.2) this.facing = ii.axis > 0 ? 1 : -1;
+          let speed = WALK_SPEED;
           if (this.state === "sprint") {
             this.sprintT += dt;
             // §4 ramp: 12 frames of true acceleration — the first strides DIG
-            speed = lerp(WALK_SPEED, SPRINT_SPEED, clamp(this.sprintT / (12 * F), 0, 1)) * Math.abs(ii.axis);
+            speed = lerp(WALK_SPEED, SPRINT_SPEED, clamp(this.sprintT / (12 * F), 0, 1));
           }
-          this.x += speed * this.facing * dt;
-          this.walkPhase += (speed / (this.state === "sprint" ? 31 : 26)) * dt;
+          this.x += speed * ii.axis * inv * dt;
+          this.z += speed * DEPTH_SPEED * ii.axisZ * inv * dt;
+          this.walkPhase += ((speed * Math.min(moveMag, 1)) / (this.state === "sprint" ? 31 : 26)) * dt;
+          this.depthMoveT = Math.abs(ii.axisZ) > 0.25 ? 0.12 : Math.max(0, this.depthMoveT - dt);
         }
       } else if (this.state === "walk") {
         this.state = "idle"; this.stateT = 0;
       } else if (this.state === "sprint") {
         // §4: stopping takes 6 frames of settle — plant, skid-dust, cloak overtakes
         this.state = "skid"; this.stateT = 0;
-        fx.dust(this.x + this.facing * 10, GROUND_Y - 2, 7, this.facing);
+        fx.dust(this.x + this.facing * 10, this.groundY() - 2, 7, this.facing);
       }
+      if (moveMag <= 0.2) this.depthMoveT = Math.max(0, this.depthMoveT - dt);
       if (this.state === "skid" && this.stateT >= 6 * F) { this.state = "idle"; this.stateT = 0; }
-    } else if (this.state === "guard" && Math.abs(ii.axis) > 0.2) {
-      this.x += GUARD_SHUFFLE * ii.axis * dt; // guarded shuffle — facing stays locked
-    } else if (this.state === "crawl" && Math.abs(ii.axis) > 0.2) {
-      this.x += CRAWL_SPEED * ii.axis * dt;
+    } else if (this.state === "guard" && moveMag > 0.2) {
+      // guarded shuffle — facing stays locked
+      this.x += GUARD_SHUFFLE * ii.axis * inv * dt;
+      this.z += GUARD_SHUFFLE * DEPTH_SPEED * ii.axisZ * inv * dt;
+    } else if (this.state === "crawl" && moveMag > 0.2) {
+      this.x += CRAWL_SPEED * ii.axis * inv * dt;
+      this.z += CRAWL_SPEED * DEPTH_SPEED * ii.axisZ * inv * dt;
       this.crawlPhase += dt * 2.2;
     }
     this.x += this.vx * dt;
@@ -588,11 +621,14 @@ export class Knight {
 
     // scripted displacement — roll/backstep distances are FIXED (spacing honesty)
     if (this.state === "roll") {
-      this.x = this.moveX0 + ROLL_DIST * easeInOutCubic(clamp(this.stateT / ROLL_T, 0, 1)) * this.moveDir;
+      const u = easeInOutCubic(clamp(this.stateT / ROLL_T, 0, 1));
+      this.x = this.moveX0 + ROLL_DIST * u * this.moveDir;
+      this.z = this.moveZ0 + ROLL_DIST * u * this.moveDirZ;
     } else if (this.state === "backstep") {
       this.x = this.moveX0 + BSTEP_DIST * easeOutCubic(clamp(this.stateT / BSTEP_T, 0, 1)) * this.moveDir;
     }
     this.x = clamp(this.x, this.boundsL, this.boundsR);
+    this.z = clamp(this.z, this.bandN, this.bandF);
 
     // fatigue reads as slower recoveries — never a bar (§8)
     const fatigue = this.wounds >= 2 ? 0.86 : 1;
@@ -620,11 +656,11 @@ export class Knight {
         if (!this.actFired && this.stateT >= m.impact) {
           this.actFired = true;
           const n = m.dust + Math.round(this.heavyCharge * 8);
-          fx.dust(this.x + this.facing * 66, GROUND_Y - 8, n, this.facing);
+          fx.dust(this.x + this.facing * 66, this.groundY() - 8, n, this.facing);
         }
         // the cancel window is a contract (§10)
         if (this.stateT >= m.cancelFrom) {
-          if (this.rollBuf > 0) this.startRollOrBackstep(ii.axis, fx);
+          if (this.rollBuf > 0) this.startRollOrBackstep(ii.axis, ii.axisZ, fx);
           else if (this.chainBuf > 0 && m.chain) this.startAct(MOVES[m.chain]);
         }
         if (this.state === "act" && this.stateT >= m.total) {
@@ -697,7 +733,7 @@ export class Knight {
         }
         rate = 16;
         if (this.stateT === 0.6 || (this.stateT >= 0.6 && this.stateT - dt < 0.6)) {
-          fx.dust(this.x + this.facing * 30, GROUND_Y - 2, 5, this.facing * 0.3);
+          fx.dust(this.x + this.facing * 30, this.groundY() - 2, 5, this.facing * 0.3);
         }
         if (this.stateT >= QUIET_T) { this.state = "idle"; this.stateT = 0; }
         break;
@@ -765,7 +801,7 @@ export class Knight {
         const s = Math.sign(Math.sin(this.walkPhase));
         if (s !== this.lastStepSign) {
           this.lastStepSign = s;
-          fx.dust(this.x - this.facing * 10, GROUND_Y - 2, 5, -this.facing * 0.6);
+          fx.dust(this.x - this.facing * 10, this.groundY() - 2, 5, -this.facing * 0.6);
         }
         break;
       }
@@ -776,7 +812,7 @@ export class Knight {
         const s = Math.sign(Math.sin(this.walkPhase));
         if (s !== this.lastStepSign) {
           this.lastStepSign = s;
-          fx.dust(this.x - this.facing * 8, GROUND_Y - 2, 3, -this.facing * 0.4);
+          fx.dust(this.x - this.facing * 8, this.groundY() - 2, 3, -this.facing * 0.4);
         }
         break;
       }
@@ -882,7 +918,7 @@ export class Knight {
         const d = Math.hypot(dx, dy) || 1;
         const diff = (d - CLOAK_LINK) / d;
         p1.x -= dx * diff; p1.y -= dy * diff;
-        if (p1.y > GROUND_Y - 2) p1.y = GROUND_Y - 2; // pools on ground when lying
+        if (p1.y > this.groundY() - 2) p1.y = this.groundY() - 2; // pools on ground when lying
       }
     }
   }
@@ -897,7 +933,8 @@ export class Knight {
   private anchors() {
     // cloak attach point in WORLD space (cloak sim is world-space)
     const pts = this.compute();
-    return { cloakX: this.x + pts.cloak[0] * this.facing, cloakY: GROUND_Y + pts.cloak[1] };
+    const s = this.zScale();
+    return { cloakX: this.x + pts.cloak[0] * this.facing * s, cloakY: this.groundY() + pts.cloak[1] * s };
   }
 
   compute() {
@@ -947,9 +984,11 @@ export class Knight {
   draw(ctx: CanvasRenderingContext2D) {
     const p = this.compute();
     this.limbIdx = 0; // stable per-limb variation each frame
+    const s = this.zScale();
     ctx.save();
-    ctx.translate(this.x, GROUND_Y);
-    ctx.scale(this.facing, 1);
+    // §18: the band offsets the feet line and breathes the scale, anchored at the feet
+    ctx.translate(this.x, this.groundY());
+    ctx.scale(this.facing * s, s);
 
     // long shadow thrown away from the sun (cinematic key light)
     const lowY = Math.max(p.ftF[1], p.ftN[1], p.pel[1] + 8);
@@ -1014,11 +1053,13 @@ export class Knight {
 
   swordTipWorld(): [number, number] {
     const p = this.compute();
-    return [this.x + p.tip[0] * this.facing, GROUND_Y + p.tip[1]];
+    const s = this.zScale();
+    return [this.x + p.tip[0] * this.facing * s, this.groundY() + p.tip[1] * s];
   }
   swordGuardWorld(): [number, number] {
     const p = this.compute();
-    return [this.x + p.guard[0] * this.facing, GROUND_Y + p.guard[1]];
+    const s = this.zScale();
+    return [this.x + p.guard[0] * this.facing * s, this.groundY() + p.guard[1] * s];
   }
   attackSmearActive(): boolean {
     if (this.state !== "act" || !this.act) return false;
@@ -1026,13 +1067,15 @@ export class Knight {
   }
   // fires EXACTLY ONCE per act, at the strike frame — main.ts resolves the hit
   private strikeConsumed = false;
-  strikeEvent(): { x: number; reach: number; heavy: boolean; ring: boolean; loud: number; stop: number } | null {
+  strikeEvent(): { x: number; z: number; zTol: number; reach: number; heavy: boolean; ring: boolean; loud: number; stop: number } | null {
     if (this.state !== "act" || !this.act) { this.strikeConsumed = false; return null; }
     if (this.strikeConsumed || this.stateT < this.act.impact) return null;
     this.strikeConsumed = true;
     const heavy = this.act === MOVES.HEAVY;
     return {
       x: this.x + this.facing * (66 + this.act.lunge),
+      z: this.z,
+      zTol: Z_TOL, // generous to hit (§18) — the band never makes a swing feel robbed
       reach: 92,
       heavy,
       ring: heavy, // a heavy digs the earth — every whiffed heavy IS the Ring (§14 v1 form)
@@ -1274,9 +1317,10 @@ export class Knight {
   private drawCloak(ctx: CanvasRenderingContext2D) {
     const n = this.cloak;
     // cloak nodes are in WORLD space; we're inside local transform — convert
+    const s = this.zScale();
     ctx.save();
-    ctx.scale(this.facing, 1); // undo flip (cloak sim is world-space)
-    ctx.translate(-this.x, -GROUND_Y);
+    ctx.scale(this.facing / s, 1 / s); // undo flip + band scale (cloak sim is world-space)
+    ctx.translate(-this.x, -this.groundY());
     ctx.fillStyle = "#0c0912";
     ctx.beginPath();
     const w = (i: number) => 7 + (i / (CLOAK_N - 1)) * 13;

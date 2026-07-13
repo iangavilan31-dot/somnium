@@ -5,7 +5,7 @@
 // No blood, ever: they bleed ink and noise.
 
 import { clamp, damp, easeInCubic, easeInOutCubic, easeOutCubic, lerp, noise1, rad, TAU } from "./math";
-import { GROUND_Y } from "./paint";
+import { BAND_FAR, BAND_NEAR, GROUND_Y, Z_SCALE, Z_SLOPE, Z_TOL } from "./paint";
 import { P, sampleTimeline, legIK, type Key, type Pose, type Knight } from "./knight";
 import type { Fx } from "./fx";
 
@@ -46,6 +46,9 @@ export type ShadeState =
 
 export class Shade {
   x: number; facing = 1;
+  z = 0;                      // depth in the band (M&C §18)
+  homeZ = 0;
+  bandN = BAND_NEAR; bandF = BAND_FAR;
   home: number;               // where it slept for centuries; de-escalation returns it
   state: ShadeState = "settled";
   stateT = 0;
@@ -60,10 +63,14 @@ export class Shade {
   private calmT = 0;          // silence accumulator → settling back
   private attackCd = 0;       // breath between blows — readable, answerable
 
-  constructor(x: number) {
+  constructor(x: number, z = 0) {
     this.x = x; this.home = x;
+    this.z = z; this.homeZ = z;
     this.seed = (x * 7.13) % 10;
   }
+
+  groundY() { return GROUND_Y + this.z * Z_SLOPE; }
+  zScale() { return 1 + this.z * Z_SCALE; }
 
   get staggered() { return this.state === "stagger" || this.state === "stalled"; }
   get alive() { return this.state !== "quieted" && this.state !== "gone"; }
@@ -78,14 +85,14 @@ export class Shade {
     const open = this.state === "stagger" || this.state === "stalled" || this.state === "settled"
       || (this.state === "attack" && this.stateT > ATK_STRIKE_T + 4 / 60);
     if (!heavy && this.dents === 0 && !open) {
-      fx.glance(this.x - dir * 18, GROUND_Y - 58, dir);
+      fx.glance(this.x - dir * 18, this.groundY() - 58, dir);
       return "glance";
     }
     if (heavy) { this.dents = Math.min(3, this.dents + 1); }
     this.posture = Math.max(0, this.posture - (heavy ? 2 : 1));
     this.hitFlash = 0.12;
     this.x += dir * (heavy ? 26 : 12);
-    fx.inkSplash(this.x - dir * 10, GROUND_Y - 52, dir, heavy ? 10 : 6);
+    fx.inkSplash(this.x - dir * 10, this.groundY() - 52, dir, heavy ? 10 : 6);
     if (this.posture === 0 && !this.staggered) {
       this.state = "stagger"; this.stateT = 0;
       return "stagger";
@@ -104,11 +111,11 @@ export class Shade {
   }
 
   // returns a pending strike zone once per attack, at the crash frame
-  strikeEvent(): { x: number; reach: number } | null {
+  strikeEvent(): { x: number; z: number; zTol: number; reach: number } | null {
     if (this.state !== "attack") { this.strikeFired = false; return null; }
     if (this.strikeFired || this.stateT < ATK_STRIKE_T) return null;
     this.strikeFired = true;
-    return { x: this.x + this.facing * 62, reach: 78 };
+    return { x: this.x + this.facing * 62, z: this.z, zTol: Z_TOL, reach: 78 };
   }
 
   update(dt: number, t: number, knights: (Knight | null)[], fx: Fx, fireX: number | null = null) {
@@ -126,7 +133,8 @@ export class Shade {
       // THE HEARTH IS KEPT: a knight beside a lit fire is lawful quiet —
       // the Stirred lose the scent at its edge (the rest ritual is safe ground)
       if (fireX != null && Math.abs(k.x - fireX) < 220) continue;
-      const d = Math.abs(k.x - this.x);
+      // §18: hearing is elliptical — the band is shallow, so depth counts double
+      const d = Math.hypot(k.x - this.x, (k.z - this.z) * 2);
       const heard = Math.max(
         k.loudness(t) * clamp(1 - d / 700, 0, 1),
         d < 170 ? 0.45 : 0,
@@ -161,10 +169,17 @@ export class Shade {
           this.calmT = 0;
           this.facing = target.x >= this.x ? 1 : -1;
           const gap = Math.abs(target.x - this.x);
+          const dz = target.z - this.z;
+          // §18/§21: it seeks the band line FIRST — alignment is its telegraph.
+          // watching a Shade shamble into your depth lane IS the warning.
+          if (Math.abs(dz) > 6) {
+            this.z = clamp(this.z + Math.sign(dz) * Math.min(38 * dt, Math.abs(dz)), this.bandN, this.bandF);
+            this.walkPhase += 1.2 * dt;
+          }
           if (gap > 88) {
             this.x += 55 * this.facing * dt;
             this.walkPhase += 2.4 * dt;
-          } else if (this.attackCd <= 0) {
+          } else if (this.attackCd <= 0 && Math.abs(dz) < 20) {
             this.state = "attack"; this.stateT = 0; this.strikeFired = false;
             this.attackCd = 1.1 + (noise1(this.seed * 5) + 1) * 0.35;
           }
@@ -172,6 +187,8 @@ export class Shade {
           // silence. the fight can be un-had — drift home, kneel back into the dream
           this.calmT += dt;
           const dh = this.home - this.x;
+          const dhz = this.homeZ - this.z;
+          if (Math.abs(dhz) > 4) this.z += Math.sign(dhz) * 22 * dt;
           if (Math.abs(dh) > 8) {
             this.x += Math.sign(dh) * 30 * dt;
             this.walkPhase += 1.4 * dt;
@@ -217,7 +234,7 @@ export class Shade {
         pose.torso = this.cur.torso;
         this.poolA = Math.min(0.5, this.poolA + dt * 0.35);
         rate = 6;
-        if (u >= 1) { this.state = "gone"; this.stateT = 0; fx.inkSplash(this.x, GROUND_Y - 6, 0, 8); }
+        if (u >= 1) { this.state = "gone"; this.stateT = 0; fx.inkSplash(this.x, this.groundY() - 6, 0, 8); }
         break;
       }
       default:
@@ -292,9 +309,10 @@ export class Shade {
       return;
     }
     const p = this.compute();
+    const s = this.zScale();
     ctx.save();
-    ctx.translate(this.x, GROUND_Y);
-    ctx.scale(this.facing, 1);
+    ctx.translate(this.x, this.groundY());
+    ctx.scale(this.facing * s, s);
 
     // shadow
     const feetX = (p.ftF[0] + p.ftN[0]) / 2;
@@ -304,7 +322,7 @@ export class Shade {
     ctx.ellipse(feetX, -2, 36, 6.5, 0, 0, TAU);
     ctx.fill();
     ctx.globalAlpha = 1;
-    if (this.poolA > 0.01) { ctx.restore(); this.drawPool(ctx); ctx.save(); ctx.translate(this.x, GROUND_Y); ctx.scale(this.facing, 1); }
+    if (this.poolA > 0.01) { ctx.restore(); this.drawPool(ctx); ctx.save(); ctx.translate(this.x, this.groundY()); ctx.scale(this.facing * s, s); }
 
     const agitated = this.threatening ? 1 : 0.35;
     const INK = "#0a0714", PLATE = "#141019";
@@ -377,7 +395,7 @@ export class Shade {
     ctx.globalAlpha = this.state === "gone" ? this.poolA * Math.max(0, 1 - this.stateT / 14) : this.poolA;
     ctx.fillStyle = "#07050c";
     ctx.beginPath();
-    ctx.ellipse(this.x, GROUND_Y - 2, 40, 7, 0, 0, TAU);
+    ctx.ellipse(this.x, this.groundY() - 2, 40 * this.zScale(), 7 * this.zScale(), 0, 0, TAU);
     ctx.fill();
     ctx.restore();
   }

@@ -3,7 +3,7 @@
 // (rest together) re-dreams the world forward. Two knights, local drop-in.
 
 import { clamp, damp, easeInOutCubic, lerp, noise1 } from "./math";
-import { bakeEmberVeil, bakeGrainTiles, bakeGlowSprite, bakeVignette, GROUND_Y, PLATE_RES, WORLD_W } from "./paint";
+import { BAND_FAR, BAND_NEAR, bakeEmberVeil, bakeGrainTiles, bakeGlowSprite, bakeVignette, GROUND_Y, PLATE_RES, WORLD_W } from "./paint";
 import { Knight, NO_INTENT, type Intents } from "./knight";
 import { Fx } from "./fx";
 import { InputHub, type PlayerInput } from "./input";
@@ -49,13 +49,20 @@ function enterScene(idx: number, freshKnights: boolean) {
   bake = bakes.get(scene.id)!;
   fire = scene.fireX != null ? new Campfire(scene.fireX) : null;
   fx.setScene(scene.id);
-  shades = (SHADE_SPAWNS[scene.id] ?? []).map((x) => new Shade(x));
+  const bandN = scene.bandNear ?? BAND_NEAR, bandF = scene.bandFar ?? BAND_FAR;
+  // the Stirred slept scattered across the band, not on one line (§18)
+  shades = (SHADE_SPAWNS[scene.id] ?? []).map((x, i) => {
+    const s = new Shade(x, lerp(bandN * 0.6, bandF * 0.6, (i % 3) / 2));
+    s.bandN = bandN; s.bandF = bandF;
+    return s;
+  });
   hushBeatArmed = shades.length > 0;
   awake = scene.id === 5 ? new FirstAwake() : null;
   tollAcc = 0;
   for (const k of knights) {
     if (!k) continue;
     k.boundsL = scene.boundsL; k.boundsR = scene.boundsR;
+    k.bandN = bandN; k.bandF = bandF;
     k.lightX = scene.lightX;
     if (freshKnights) {
       k.resetToLying(scene.spawnX + (k === knights[1] ? 70 : 0));
@@ -83,9 +90,16 @@ function joinP2() {
   if (knights[1]) return;
   const k = new Knight(clamp(p1.x + 80, scene.boundsL, scene.boundsR));
   k.boundsL = scene.boundsL; k.boundsR = scene.boundsR; k.lightX = scene.lightX;
+  k.bandN = scene.bandNear ?? BAND_NEAR; k.bandF = scene.bandFar ?? BAND_FAR;
   k.resetToLying(k.x);
+  k.z = clamp(p1.z + 12, k.bandN, k.bandF); // wakes beside, a step into the band
   k.startWake(); // P2 does not join a lobby. P2 wakes up.
   knights[1] = k;
+}
+
+// §18 proximity is elliptical — the band is shallow, so depth counts double
+function nearXZ(ax: number, az: number, bx: number, bz: number, r: number) {
+  return Math.hypot(ax - bx, (az - bz) * 2.2) < r;
 }
 
 const ZOOM_WIDE = 0.88, ZOOM_MID = 1.08; // the world dwarfs the knights
@@ -132,6 +146,7 @@ declare global {
       replay: () => void; state: () => string; attack: () => void; hit: () => void;
       walk: (ax: number) => void; scene: () => number; join2: () => void;
       rest: (held: boolean) => void; skipToScene: (id: number) => void; x: () => number;
+      z: () => number; walkz: (az: number) => void;
       // Phase 2a QA hooks (real keys are still the law for proof captures)
       tap: (n: "attack" | "heavy" | "roll" | "parry") => void;
       sprint: (b: boolean) => void; guard: (b: boolean) => void;
@@ -145,6 +160,7 @@ declare global {
   }
 }
 let forcedAxis = 0;
+let forcedAxisZ = 0;
 let forcedRest = false;
 let forcedSprint = false;
 let forcedGuard = false;
@@ -164,6 +180,8 @@ window.__somnium = {
     if (i >= 0) { enterScene(i, true); trans = "in"; transT = 0; }
   },
   x: () => p1.x,
+  z: () => p1.z,
+  walkz: (az: number) => { forcedAxisZ = az; },
   tap: (n) => {
     if (n === "attack") forcedTap.attackTap = true;
     else if (n === "heavy") forcedTap.heavyTap = true;
@@ -184,7 +202,7 @@ window.__somnium = {
     const vs = Math.max(cw / 1920, ch / 1080);
     return (cw / 2 + (k.x - cam.x) * vs * cam.zoom) / dpr;
   },
-  shades: () => shades.map((s) => `${s.state}@${Math.round(s.x)}p${s.posture}d${s.dents}`).join("|"),
+  shades: () => shades.map((s) => `${s.state}@${Math.round(s.x)},${Math.round(s.z)}p${s.posture}d${s.dents}`).join("|"),
   awake: () => (awake ? `${awake.state} t${awake.tolls}` : "none"),
   awakePose: (r: number) => awake?.debugPose(r),
 };
@@ -198,22 +216,24 @@ let acc = 0, last = performance.now();
 
 function knightInput(k: Knight, partner: Knight | null, inp: PlayerInput, dt: number, forced: boolean) {
   const axis = forced && forcedAxis !== 0 ? forcedAxis : inp.axis();
+  const axisZ = forced && forcedAxisZ !== 0 ? forcedAxisZ : inp.axisZ();
   if (inp.hitPressed()) k.tryHit(fx);
-  const nearFire = fire != null && Math.abs(k.x - fire.x) < 90;
-  const stationary = Math.abs(axis) < 0.2;
+  const nearFire = fire != null && nearXZ(k.x, k.z, fire.x, 0, 90);
+  const stationary = Math.hypot(axis, axisZ) < 0.2;
   const held = (forced && forcedRest) || inp.restHeld();
   // ONE held gesture, two meanings: tend a fallen partner first, else rest at the fire
-  const partnerDown = !!partner && partner.downed && Math.abs(k.x - partner.x) < 56;
+  const partnerDown = !!partner && partner.downed && nearXZ(k.x, k.z, partner.x, partner.z, 56);
   k.setEmbrace(partnerDown && held && stationary, partner ? partner.x : k.x);
   // THE QUIETING (§13): the same tend-gesture, aimed at a staggered Stirred —
   // rest, revive, still: one gesture family, three mercies
   if (held && stationary && (k.state === "idle" || k.state === "walk")) {
-    const q = shades.find((s) => s.staggered && Math.abs(s.x - k.x) < 64);
+    const q = shades.find((s) => s.staggered && nearXZ(s.x, s.z, k.x, k.z, 64));
     if (q && k.startQuieting()) q.beginQuieting();
   }
   k.setRest(held && nearFire && stationary && !partnerDown, fire ? fire.x : k.x);
   const ii: Intents = {
     axis: k.sitting || k.state === "embrace" ? 0 : axis,
+    axisZ: k.sitting || k.state === "embrace" ? 0 : axisZ,
     sprint: inp.sprintHeld() || (forced && forcedSprint),
     attackTap: inp.attackPressed() || !!(forced && forcedTap.attackTap),
     heavyTap: inp.heavyPressed() || !!(forced && forcedTap.heavyTap),
@@ -270,7 +290,8 @@ function sim(dt: number) {
     let landed = false;
     for (const s of shades) {
       if (!s.alive) continue;
-      if (Math.abs(s.x - ev.x) < ev.reach) {
+      // §18: generous to hit — the swing owns a wide z-band, never robbed by depth
+      if (Math.abs(s.x - ev.x) < ev.reach && Math.abs(s.z - ev.z) < ev.zTol) {
         if (s.struck(ev.heavy, k.x, fx) !== "glance") landed = true;
       }
     }
@@ -282,13 +303,38 @@ function sim(dt: number) {
     const sev = s.strikeEvent();
     if (sev) {
       for (const k of [p1, k2]) {
-        if (!k || Math.abs(k.x - sev.x) >= sev.reach) continue;
+        // §18: honest to dodge — walking the band narrows the knight's hurt z-band
+        if (!k || Math.abs(k.x - sev.x) >= sev.reach || Math.abs(k.z - sev.z) >= Math.min(sev.zTol, k.hurtZ())) continue;
         const out = k.tryHit(fx);
         if (out === "parried") s.stall(); // its ink caught mid-stroke (§11)
         else if (out === "hit" || out === "downed") hitstopT = Math.max(hitstopT, 3 / 60);
       }
     }
     s.update(adt, t, knights, fx, fire ? fire.x : null);
+  }
+  // §18: kin never stack — the surround stays legible (magnet repulsion)
+  for (let i = 0; i < shades.length; i++) {
+    const a = shades[i];
+    if (!a.alive) continue;
+    for (let j = i + 1; j < shades.length; j++) {
+      const b = shades[j];
+      if (!b.alive) continue;
+      const dx = b.x - a.x, dz = b.z - a.z;
+      if (Math.abs(dx) < 34 && Math.abs(dz) < 14) {
+        const push = Math.sign(dz || (Math.random() - 0.5)) * 26 * adt;
+        a.z = clamp(a.z - push, a.bandN, a.bandF);
+        b.z = clamp(b.z + push, b.bandN, b.bandF);
+      }
+    }
+  }
+  // the knights repel too — brothers-in-arms, never one sprite (§18 co-op law)
+  if (k2 && !p1.downed && !k2.downed && p1.state !== "embrace" && k2.state !== "embrace") {
+    const dx = k2.x - p1.x, dz = k2.z - p1.z;
+    if (Math.abs(dx) < 26 && Math.abs(dz) < 10) {
+      const push = Math.sign(dz || 1) * 30 * adt;
+      p1.z = clamp(p1.z - push, p1.bandN, p1.bandF);
+      k2.z = clamp(k2.z + push, k2.bandN, k2.bandF);
+    }
   }
   // when the LAST accident of noise is un-had, the world holds its breath (§9)
   if (hushBeatArmed && shades.length > 0 && shades.every((s) => !s.alive)) {
@@ -310,13 +356,13 @@ function sim(dt: number) {
           tollAcc += (k.state === "sprint" ? 268 : 150) * adt;
           if (tollAcc > 62) {
             tollAcc = 0;
-            fx.tollRing(k.x, GROUND_Y + 4);
+            fx.tollRing(k.x, k.groundY() + 4);
             awake.toll(t, k.state === "sprint" ? 2 : 1);
           }
         }
         if (k.state === "roll" || k.state === "act") {
           // steel and tumbling ring the bronze harder than any step
-          if (k.stateT < dt * 2) { fx.tollRing(k.x, GROUND_Y + 4); awake.toll(t, 2); }
+          if (k.stateT < dt * 2) { fx.tollRing(k.x, k.groundY() + 4); awake.toll(t, 2); }
         }
       }
     }
@@ -334,7 +380,7 @@ function sim(dt: number) {
   for (const [a, b] of [[p1, k2], [k2, p1]] as const) {
     if (!a || !b) continue;
     if (a.state === "embrace") {
-      if (b.downed && Math.abs(a.x - b.x) < 64 && a.stateT > 0.35) b.reviveT += dt;
+      if (b.downed && nearXZ(a.x, a.z, b.x, b.z, 64) && a.stateT > 0.35) b.reviveT += dt;
       // stay kneeling THROUGH the partner's rise — you don't let go early
       else if (!b.downed && b.state !== "rise") a.setEmbrace(false, b.x);
     }
@@ -396,7 +442,9 @@ function sim(dt: number) {
     cam.zoom = lerp(ZOOM_WIDE, ZOOM_MID, easeInOutCubic(p));
     cam.x = damp(cam.x, p1.x + p1.facing * 30, 2.5, dt);
   } else if (p1.wakeDone) {
-    if (hub.anyKeyThisFrame || Math.abs(hub.p1.axis()) > 0.2 || Math.abs(hub.p2.axis()) > 0.2 || forcedAxis !== 0) {
+    if (hub.anyKeyThisFrame || Math.abs(hub.p1.axis()) > 0.2 || Math.abs(hub.p2.axis()) > 0.2
+      || Math.abs(hub.p1.axisZ()) > 0.2 || Math.abs(hub.p2.axisZ()) > 0.2
+      || forcedAxis !== 0 || forcedAxisZ !== 0) {
       lastInputT = t;
     }
     // the repose (light v1): both knights still ~4s → the camera exhales into the
@@ -495,9 +543,13 @@ function render() {
   ctx.translate(cx + (0 - cam.x) * s, gsY + (0 - GROUND_Y) * s);
   ctx.scale(s, s);
   fx.draw(ctx);
-  fire?.draw(ctx, GROUND_Y, fireGlow, t);
-  for (const s of shades) s.draw(ctx, t); // the Stirred stand behind the living
-  for (const k of knights) k?.draw(ctx);
+  // §18: the band decides who stands in front — one z-sorted painter's pass
+  const worldDraws: { z: number; draw: () => void }[] = [];
+  if (fire) { const f = fire; worldDraws.push({ z: 0, draw: () => f.draw(ctx, GROUND_Y, fireGlow, t) }); }
+  for (const sh of shades) worldDraws.push({ z: sh.z, draw: () => sh.draw(ctx, t) });
+  for (const k of knights) if (k) worldDraws.push({ z: k.z, draw: () => k.draw(ctx) });
+  worldDraws.sort((a, b) => a.z - b.z);
+  for (const d of worldDraws) d.draw();
   ctx.restore();
 
   // mid layers — just in front of the play plane (thorn sentinel etc.)

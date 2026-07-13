@@ -6,6 +6,10 @@
 
 const P1_KEYS_AXIS_NEG = ["ArrowLeft", "KeyA"];
 const P1_KEYS_AXIS_POS = ["ArrowRight", "KeyD"];
+// THE DEPTH BAND (M&C §18): W/up = away from the reader (−z), S/down = toward (+z).
+// The rest/tend gesture moved from S-hold to E-hold when S became a movement key.
+const P1_KEYS_DEPTH_NEG = ["ArrowUp", "KeyW"];
+const P1_KEYS_DEPTH_POS = ["ArrowDown", "KeyS"];
 
 export class PlayerInput {
   padIndex = -1; // claimed pad, -1 = none
@@ -34,6 +38,20 @@ export class PlayerInput {
     }
     return Math.max(-1, Math.min(1, a));
   }
+  axisZ(): number {
+    let a = 0;
+    if (this.useKeyboard) {
+      for (const k of P1_KEYS_DEPTH_NEG) if (this.hub.keys.has(k)) a -= 1;
+      for (const k of P1_KEYS_DEPTH_POS) if (this.hub.keys.has(k)) a += 1;
+    }
+    const p = this.pad();
+    if (p) {
+      if (Math.abs(p.axes[1]) > 0.25) a += p.axes[1]; // stick down = toward the reader
+      if (p.buttons[12]?.pressed) a -= 1;
+      if (p.buttons[13]?.pressed) a += 1;
+    }
+    return Math.max(-1, Math.min(1, a));
+  }
   private padEdge(b: number) { return this.padIndex >= 0 && this.hub.padEdges.get(this.padIndex)?.has(b); }
   private key(c: string) { return this.useKeyboard && this.hub.edges.has(c); }
   private keyHeld(c: string) { return this.useKeyboard && this.hub.keys.has(c); }
@@ -52,7 +70,7 @@ export class PlayerInput {
   guardHeld() { return this.keyHeld("KeyL") || this.padHeld(4); } // LB hold = guard
   parryPressed() { return this.key("KeyO") || this.key("Semicolon") || this.padEdge(5); } // RB tap = Hush-parry
   hitPressed() { return this.key("KeyH"); } // debug harm (keyboard only)
-  restHeld() { return this.keyHeld("KeyS") || this.keyHeld("ArrowDown") || this.padHeld(1); } // circle/B held = rest at fire
+  restHeld() { return this.keyHeld("KeyE") || this.padHeld(1); } // E / circle/B held = the tend gesture (S now walks the band)
   replayPressed() { return this.key("KeyR") || this.padEdge(9); }
 }
 

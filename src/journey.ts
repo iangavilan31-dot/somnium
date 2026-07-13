@@ -19,6 +19,9 @@ export interface SceneDef {
   whisper: string;            // 2–5 serif words on entry
   whisperColor?: string;      // override when the default pale wash can't read
   boundsL: number; boundsR: number;
+  // THE DEPTH BAND (M&C §18) — designed play space; omit for the defaults.
+  // Narrow ribbons (the stair) vs generous meadows are composition, authored here.
+  bandNear?: number; bandFar?: number;
   spawnX: number;             // where the knights enter walking (or wake, scene 1)
   lightX: number;             // key-light world x — shadows point away from it
   glaze: string;              // the scene's unifying wash color
