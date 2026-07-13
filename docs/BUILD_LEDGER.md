@@ -74,10 +74,16 @@ _Order chosen so every step is provable in the yard before it touches the journe
       journey's jumps stay authored** (Space in journey = nothing, probe-verified).
       REMAINING (moved to 2.75h): slide (S2 hill / S5 drifts), slide-under, vault, mantle —
       authored set-piece verbs, built with their journey geometry per §1.5.
-- [ ] 2.75g. Roster §21 (each = approaches→critique→synthesize per Review Board):
-      the Sealed → the Startled → the Crier → the Burdened → the Remembered
-- [ ] 2.75h. Journey integration: bands + sparse variant placement per scene (S1 teacher
-      pair, S2 Sealed intro, S3 Crier vista ambush, S4 Burdened + Remembered), regression walk
+- [x] 2.75g. Roster §21 ✅ 2026-07-12 (commit 7984a10, proof docs/roster/): all five
+      variants live, lessons probe-verified (sealed wall+seam, startled sprawl, burdened
+      mass+glance, crier shove+wake-kin, remembered drill+parry-kneel); KINDS table in
+      stirred.ts; yard keys Digit1-6/0. INPUT LAW FIXED: roll on short-release (<180ms),
+      hold-sprint never rolls (found by a failed probe sprint-past; CANON_LOG line).
+- [x] 2.75h. Journey integration ✅ 2026-07-12: kinded spawns S1 teacher / S2 sealed+stirred
+      / S3 startled+crier / S4 burdened+remembered; regression green (S1 sprint-exit
+      wounds 0, scenes 2-6 enter clean, 165fps each). NOTE: walking blindly into the S1
+      teacher = death loop (correct fiction — regression must play like a player).
+      OPEN NOISE: one 404 resource on boot (favicon-level, pre-existing) — check in 4b.
 
 ## Phase 3 — THE FIRST AWAKE
 - [x] 3a. THE REVEAL ✅ BOARD-PASSED 2026-07-12 (proof docs/awake/, esp. 08-the-ward = the poster)
