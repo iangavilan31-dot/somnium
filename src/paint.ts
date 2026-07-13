@@ -13,7 +13,7 @@ export const GROUND_Y = 940;
 export const Z_SLOPE = 1.0;      // screen px per z unit at the feet line
 export const Z_SCALE = 0.0012;   // scale per z unit (±~5% across a default band) TUNE
 export const Z_TOL = 26;         // generous attack z-tolerance (SoR4 pick) TUNE
-export const BAND_NEAR = -40, BAND_FAR = 40; // default half-depths; scenes override
+export const BAND_MIN = -40, BAND_MAX = 40; // band edges: min = away, max = toward the reader
 export const DEPTH_SPEED = 0.6;  // z moves at 0.6× walk cadence (belt-scroller) TUNE
 export const DESIGN_H = 1080;
 export const PLATE_H = 1280; // plates extend below design height — wide camera sees to ~1250

@@ -3,7 +3,7 @@
 // (rest together) re-dreams the world forward. Two knights, local drop-in.
 
 import { clamp, damp, easeInOutCubic, lerp, noise1 } from "./math";
-import { BAND_FAR, BAND_NEAR, bakeEmberVeil, bakeGrainTiles, bakeGlowSprite, bakeVignette, GROUND_Y, PLATE_RES, WORLD_W } from "./paint";
+import { BAND_MAX, BAND_MIN, bakeEmberVeil, bakeGrainTiles, bakeGlowSprite, bakeVignette, GROUND_Y, PLATE_RES, WORLD_W } from "./paint";
 import { Knight, NO_INTENT, type Intents } from "./knight";
 import { Fx } from "./fx";
 import { InputHub, type PlayerInput } from "./input";
@@ -11,6 +11,7 @@ import { drawDebug, type Perf } from "./debug";
 import { Campfire, SCENES, type SceneBake, type SceneDef } from "./journey";
 import { Shade, SHADE_SPAWNS } from "./stirred";
 import { FirstAwake, AWAKE_X, FLOOR_L, FLOOR_R } from "./awake";
+import { BoundPost, YARD, YARD_IDX } from "./yard";
 import "./scenes/index"; // registers scenes 2+ into SCENES
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
@@ -44,16 +45,17 @@ let fire: Campfire | null = null;
 
 function enterScene(idx: number, freshKnights: boolean) {
   sceneIdx = idx;
-  scene = SCENES[idx];
+  scene = idx === YARD_IDX ? YARD : SCENES[idx];
   if (!bakes.has(scene.id)) bakes.set(scene.id, scene.bake());
   bake = bakes.get(scene.id)!;
   fire = scene.fireX != null ? new Campfire(scene.fireX) : null;
-  fx.setScene(scene.id);
-  const bandN = scene.bandNear ?? BAND_NEAR, bandF = scene.bandFar ?? BAND_FAR;
+  post = scene.id === YARD.id ? new BoundPost() : null;
+  fx.setScene(scene.id === YARD.id ? 1 : scene.id); // the yard borrows S1's air
+  const bandN = scene.bandMin ?? BAND_MIN, bandF = scene.bandMax ?? BAND_MAX;
   // the Stirred slept scattered across the band, not on one line (§18)
   shades = (SHADE_SPAWNS[scene.id] ?? []).map((x, i) => {
     const s = new Shade(x, lerp(bandN * 0.6, bandF * 0.6, (i % 3) / 2));
-    s.bandN = bandN; s.bandF = bandF;
+    s.bandMin = bandN; s.bandMax = bandF;
     return s;
   });
   hushBeatArmed = shades.length > 0;
@@ -62,7 +64,7 @@ function enterScene(idx: number, freshKnights: boolean) {
   for (const k of knights) {
     if (!k) continue;
     k.boundsL = scene.boundsL; k.boundsR = scene.boundsR;
-    k.bandN = bandN; k.bandF = bandF;
+    k.bandMin = bandN; k.bandMax = bandF;
     k.lightX = scene.lightX;
     if (freshKnights) {
       k.resetToLying(scene.spawnX + (k === knights[1] ? 70 : 0));
@@ -86,13 +88,17 @@ let hushBeatArmed = false; // the 2s held breath when the LAST one settles (§9 
 let awake: FirstAwake | null = null;
 let tollAcc = 0; // walked distance on the buried floor since the last toll
 
+// ---------- THE YARD (M&C §22, dev-only) ----------
+const yardMode = location.search.includes("yard");
+let post: BoundPost | null = null;
+
 function joinP2() {
   if (knights[1]) return;
   const k = new Knight(clamp(p1.x + 80, scene.boundsL, scene.boundsR));
   k.boundsL = scene.boundsL; k.boundsR = scene.boundsR; k.lightX = scene.lightX;
-  k.bandN = scene.bandNear ?? BAND_NEAR; k.bandF = scene.bandFar ?? BAND_FAR;
+  k.bandMin = scene.bandMin ?? BAND_MIN; k.bandMax = scene.bandMax ?? BAND_MAX;
   k.resetToLying(k.x);
-  k.z = clamp(p1.z + 12, k.bandN, k.bandF); // wakes beside, a step into the band
+  k.z = clamp(p1.z + 12, k.bandMin, k.bandMax); // wakes beside, a step into the band
   k.startWake(); // P2 does not join a lobby. P2 wakes up.
   knights[1] = k;
 }
@@ -105,7 +111,7 @@ function nearXZ(ax: number, az: number, bx: number, bz: number, r: number) {
 const ZOOM_WIDE = 0.88, ZOOM_MID = 1.08; // the world dwarfs the knights
 const cam = { x: SCENES[0].spawnX - 50, zoom: ZOOM_WIDE };
 let t = 0;
-const skipTitle = location.search.includes("skip");
+const skipTitle = location.search.includes("skip") || yardMode; // the yard skips ceremony
 let seqT = skipTitle ? 4.55 : 0;
 let wakeStarted = false;
 let titleSkipped = skipTitle;
@@ -257,10 +263,21 @@ function sim(dt: number) {
   seqT += dt;
   hub.pollPads();
 
-  // title → scene 1 wake (first boot only)
-  if (scene.id === 1 && !wakeStarted && seqT >= 4.9) {
+  // title → scene 1 wake (first boot only; the yard wakes the same way)
+  if ((scene.id === 1 || scene.id === YARD.id) && !wakeStarted && seqT >= 4.9) {
     wakeStarted = true;
     p1.startWake();
+  }
+
+  // ---- yard spawn keys (dev harness §22): 1 = a sparring Stirred, 0 = settle all ----
+  if (yardMode) {
+    if (hub.edges.has("Digit1")) {
+      const s = new Shade(p1.x + (p1.facing > 0 ? 260 : -260), p1.z);
+      s.bandMin = p1.bandMin; s.bandMax = p1.bandMax;
+      shades.push(s);
+      hushBeatArmed = true;
+    }
+    if (hub.edges.has("Digit0")) { for (const s of shades) if (s.alive) s.beginQuieting(); }
   }
   if (hub.anyKeyThisFrame && seqT < 4.4 && !titleSkipped) {
     titleSkipped = true;
@@ -295,6 +312,11 @@ function sim(dt: number) {
         if (s.struck(ev.heavy, k.x, fx) !== "glance") landed = true;
       }
     }
+    // the Bound Post takes every strike — hitstop must feel right against felt (§22)
+    if (post && Math.abs(post.x - ev.x) < ev.reach && Math.abs(post.z - ev.z) < ev.zTol) {
+      post.struck(ev.heavy, k.x, fx);
+      landed = true;
+    }
     if (landed) hitstopT = Math.max(hitstopT, ev.stop);
     if (ev.ring) { k.noise = Math.max(k.noise, 5); k.noiseT = t; } // the unlawful bell
     fx.notifyNoise(k.x, ev.loud + (landed ? 0.5 : 0)); // the ravens answer
@@ -322,8 +344,8 @@ function sim(dt: number) {
       const dx = b.x - a.x, dz = b.z - a.z;
       if (Math.abs(dx) < 34 && Math.abs(dz) < 14) {
         const push = Math.sign(dz || (Math.random() - 0.5)) * 26 * adt;
-        a.z = clamp(a.z - push, a.bandN, a.bandF);
-        b.z = clamp(b.z + push, b.bandN, b.bandF);
+        a.z = clamp(a.z - push, a.bandMin, a.bandMax);
+        b.z = clamp(b.z + push, b.bandMin, b.bandMax);
       }
     }
   }
@@ -332,8 +354,8 @@ function sim(dt: number) {
     const dx = k2.x - p1.x, dz = k2.z - p1.z;
     if (Math.abs(dx) < 26 && Math.abs(dz) < 10) {
       const push = Math.sign(dz || 1) * 30 * adt;
-      p1.z = clamp(p1.z - push, p1.bandN, p1.bandF);
-      k2.z = clamp(k2.z + push, k2.bandN, k2.bandF);
+      p1.z = clamp(p1.z - push, p1.bandMin, p1.bandMax);
+      k2.z = clamp(k2.z + push, k2.bandMin, k2.bandMax);
     }
   }
   // when the LAST accident of noise is un-had, the world holds its breath (§9)
@@ -396,6 +418,7 @@ function sim(dt: number) {
 
   fx.update(dt);
   fire?.update(dt);
+  post?.update(dt);
 
   // ---- transitions ----
   if (trans === "none" && playable) {
@@ -403,8 +426,8 @@ function sim(dt: number) {
     if (scene.exitEastX != null && p1.x >= scene.exitEastX && (!k2 || k2.x >= scene.exitEastX - 140)) {
       beginTransition();
     }
-    // fire-rest scenes: every present knight settled at the fire
-    if (sceneIdx + 1 < SCENES.length && fire && p1.sitSettled && (!k2 || k2.sitSettled)) {
+    // fire-rest scenes: every present knight settled at the fire (the yard never advances)
+    if (sceneIdx >= 0 && sceneIdx + 1 < SCENES.length && fire && p1.sitSettled && (!k2 || k2.sitSettled)) {
       beginTransition();
     }
   }
@@ -437,7 +460,7 @@ function sim(dt: number) {
   const spread = maxX - minX;
   const vs = Math.max(cw / 1920, ch / 1080);
 
-  if (scene.id === 1 && wakeStarted && !p1.wakeDone) {
+  if ((scene.id === 1 || scene.id === YARD.id) && wakeStarted && !p1.wakeDone) {
     const p = clamp(p1.stateT / 4.25, 0, 1);
     cam.zoom = lerp(ZOOM_WIDE, ZOOM_MID, easeInOutCubic(p));
     cam.x = damp(cam.x, p1.x + p1.facing * 30, 2.5, dt);
@@ -546,6 +569,7 @@ function render() {
   // §18: the band decides who stands in front — one z-sorted painter's pass
   const worldDraws: { z: number; draw: () => void }[] = [];
   if (fire) { const f = fire; worldDraws.push({ z: 0, draw: () => f.draw(ctx, GROUND_Y, fireGlow, t) }); }
+  if (post) { const p = post; worldDraws.push({ z: p.z, draw: () => p.draw(ctx, t) }); }
   for (const sh of shades) worldDraws.push({ z: sh.z, draw: () => sh.draw(ctx, t) });
   for (const k of knights) if (k) worldDraws.push({ z: k.z, draw: () => k.draw(ctx) });
   worldDraws.sort((a, b) => a.z - b.z);
@@ -650,7 +674,13 @@ function drawText(vs: number) {
 }
 
 // ---------- boot ----------
-enterScene(0, false);
+if (yardMode) {
+  enterScene(YARD_IDX, false);
+  p1.resetToLying(YARD.spawnX);
+  cam.x = YARD.spawnX - 50;
+} else {
+  enterScene(0, false);
+}
 
 // ---------- loop ----------
 let fpsEma = 60;

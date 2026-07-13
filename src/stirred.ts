@@ -5,7 +5,7 @@
 // No blood, ever: they bleed ink and noise.
 
 import { clamp, damp, easeInCubic, easeInOutCubic, easeOutCubic, lerp, noise1, rad, TAU } from "./math";
-import { BAND_FAR, BAND_NEAR, GROUND_Y, Z_SCALE, Z_SLOPE, Z_TOL } from "./paint";
+import { BAND_MAX, BAND_MIN, GROUND_Y, Z_SCALE, Z_SLOPE, Z_TOL } from "./paint";
 import { P, sampleTimeline, legIK, type Key, type Pose, type Knight } from "./knight";
 import type { Fx } from "./fx";
 
@@ -48,7 +48,7 @@ export class Shade {
   x: number; facing = 1;
   z = 0;                      // depth in the band (M&C §18)
   homeZ = 0;
-  bandN = BAND_NEAR; bandF = BAND_FAR;
+  bandMin = BAND_MIN; bandMax = BAND_MAX;
   home: number;               // where it slept for centuries; de-escalation returns it
   state: ShadeState = "settled";
   stateT = 0;
@@ -173,7 +173,7 @@ export class Shade {
           // §18/§21: it seeks the band line FIRST — alignment is its telegraph.
           // watching a Shade shamble into your depth lane IS the warning.
           if (Math.abs(dz) > 6) {
-            this.z = clamp(this.z + Math.sign(dz) * Math.min(38 * dt, Math.abs(dz)), this.bandN, this.bandF);
+            this.z = clamp(this.z + Math.sign(dz) * Math.min(38 * dt, Math.abs(dz)), this.bandMin, this.bandMax);
             this.walkPhase += 1.2 * dt;
           }
           if (gap > 88) {

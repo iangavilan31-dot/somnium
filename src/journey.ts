@@ -21,7 +21,8 @@ export interface SceneDef {
   boundsL: number; boundsR: number;
   // THE DEPTH BAND (M&C §18) — designed play space; omit for the defaults.
   // Narrow ribbons (the stair) vs generous meadows are composition, authored here.
-  bandNear?: number; bandFar?: number;
+  // bandMin = away edge (−z), bandMax = toward-the-reader edge (+z).
+  bandMin?: number; bandMax?: number;
   spawnX: number;             // where the knights enter walking (or wake, scene 1)
   lightX: number;             // key-light world x — shadows point away from it
   glaze: string;              // the scene's unifying wash color

@@ -46,12 +46,19 @@ animation-first (GEEKED/RIFT WARDEN died ignoring it) · banned list absolute._
 
 ## Phase 2.75 — THE DEPTH AMENDMENT (master prompt v2, GYAT run 2026-07-12 — M&C §18–§22)
 _Order chosen so every step is provable in the yard before it touches the journey._
-- [ ] 2.75a. Depth plumbing: (x,z,h) world model, z-sorted world pass, contact shadows,
-      per-scene bands (SceneDef.bandNear/bandFar), depth input axis (W/S + stick-Y; rest
-      gesture moves KeyS→KeyE hold, pad unchanged), diagonal-normalized locomotion,
-      elliptical proximity checks (fire/embrace/quieting), knight repel, bounds clamp
-- [ ] 2.75b. THE YARD (?yard): S1-slice arena + the Bound Post + variant spawn keys —
-      the proving ground (build immediately after plumbing so everything lands in it)
+- [x] 2.75a. Depth plumbing ✅ 2026-07-12 (commit 25efd8f, proof docs/depth/01–07):
+      (x,z) world model + z-sorted world pass + banded rigs/cloak/shadows; SceneDef.bandMin/
+      bandMax (min = away, max = toward reader); W/S + stick-Y depth axis (REST GESTURE
+      MOVED: KeyE hold on kbd, pad B unchanged); diagonal-normalized locomotion; circling
+      depth-roll (fixed 140px vector); generous-to-hit (Z_TOL 26) / honest-to-dodge (hurtZ
+      24→15 while depth-moving); Shade lane-alignment AI (38px/s, strikes only |dz|<20) +
+      kin repulsion + elliptical hearing; buffer-clear-on-hit landed early (§19).
+      157fps, sim 0.10ms. Probe: scripts/depth-probe.mjs.
+- [x] 2.75b. THE YARD ✅ 2026-07-12 (?yard, proof docs/depth/y1–y5): scene 90 outside the
+      journey order (YARD_IDX=-1, transitions guarded), S1-slice bake, widest band ±48,
+      the Bound Post (felt thud, wobble spring, knitting dents, takes hitstop), Digit1
+      spawn sparring Stirred / Digit0 settle, whisper "practice, quietly". 158fps.
+      Probe: scripts/yard-probe.mjs.
 - [ ] 2.75c. Chain flow §19: end-pose contract L1→L2→L3→heavy-finisher slot, chained
       anticipation ≈60%, buffer-clear-on-hit, buffers-open-through-hitstop, ≤3f first response
 - [ ] 2.75d. Depth combat: z-tolerance on strike events (generous), hurt-band narrowing

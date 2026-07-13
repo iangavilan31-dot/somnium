@@ -4,7 +4,7 @@
 // every move declares impact + cancel window in the MOVES table, never fudged.
 
 import { clamp, damp, easeInCubic, easeInOutCubic, easeOutCubic, lerp, noise1, rad, TAU, type Ease } from "./math";
-import { BAND_FAR, BAND_NEAR, DEPTH_SPEED, GROUND_Y, Z_SCALE, Z_SLOPE, Z_TOL } from "./paint";
+import { BAND_MAX, BAND_MIN, DEPTH_SPEED, GROUND_Y, Z_SCALE, Z_SLOPE, Z_TOL } from "./paint";
 import type { Fx } from "./fx";
 
 // ---- proportions (world px) ----
@@ -367,7 +367,7 @@ export class Knight {
   walkPhase = 0;
   vx = 0; // knockback impulse velocity
   boundsL = 320; boundsR = 2100; // set per scene by the journey
-  bandN = BAND_NEAR; bandF = BAND_FAR; // the scene's designed depth band
+  bandMin = BAND_MIN; bandMax = BAND_MAX; // the scene's designed depth band
   lightX = 1150;                 // key-light x — shadows point away (set per scene)
   wounds = 0;                    // 3 = collapse; read as breath + stance, never a bar
   reviveT = 0;                   // filled by a partner's embrace
@@ -628,7 +628,7 @@ export class Knight {
       this.x = this.moveX0 + BSTEP_DIST * easeOutCubic(clamp(this.stateT / BSTEP_T, 0, 1)) * this.moveDir;
     }
     this.x = clamp(this.x, this.boundsL, this.boundsR);
-    this.z = clamp(this.z, this.bandN, this.bandF);
+    this.z = clamp(this.z, this.bandMin, this.bandMax);
 
     // fatigue reads as slower recoveries — never a bar (§8)
     const fatigue = this.wounds >= 2 ? 0.86 : 1;
