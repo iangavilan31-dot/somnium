@@ -69,6 +69,7 @@ export class PlayerInput {
   }
   guardHeld() { return this.keyHeld("KeyL") || this.padHeld(4); } // LB hold = guard
   parryPressed() { return this.key("KeyO") || this.key("Semicolon") || this.padEdge(5); } // RB tap = Hush-parry
+  jumpPressed() { return this.key("Space") || this.padEdge(3); } // Y/triangle = jump (gap verb; free only in the yard)
   hitPressed() { return this.key("KeyH"); } // debug harm (keyboard only)
   restHeld() { return this.keyHeld("KeyE") || this.padHeld(1); } // E / circle/B held = the tend gesture (S now walks the band)
   replayPressed() { return this.key("KeyR") || this.padEdge(9); }

@@ -202,6 +202,16 @@ const MOVES: Record<string, Move> = { L1, L2, L3, HEAVY, RUNATK, ROLLATK, POKE }
 
 // ---- non-attack timelines ----
 
+// JUMP (the gap verb, §1.5/§18) — low, heavy, knightly arc; no bunny-hop (free
+// only where the scene grants it). Ground (x,z) + height h; the shadow stays on
+// the ground and shows the landing before the knight does.
+const JUMP_V = 280, GRAV = 880; // peak ≈ 45px, air ≈ 38f — a knight in plate, not a hare
+const JUMP_RISE = P({ pelvisY: 80, torso: 8, head: -4, shL: 26, elL: 30, shR: 30, elR: 20, sword: -60, hipL: 48, shinL: -70, hipR: -34, shinR: -30 });
+const JUMP_FALL = P({ pelvisY: 78, torso: 12, head: 4, shL: 14, elL: 24, shR: 22, elR: 18, sword: -55, hipL: 30, shinL: -26, hipR: -42, shinR: -18 });
+// the airborne cut (§10 jump attack: 6f gather overhead · 3f falling strike)
+const JUMPATK_WIND = P({ pelvisY: 80, torso: -10, head: 2, shR: -150, elR: 50, sword: -16, shL: 30, elL: 24, hipL: 42, shinL: -60, hipR: -30, shinR: -26 });
+const JUMPATK_CUT = P({ pelvisY: 76, torso: 26, head: 6, shR: 70, elR: 8, sword: 30, shL: -18, elL: 26, hipL: 34, shinL: -40, hipR: -36, shinR: -20 });
+
 // ROLL — 26f, FIXED distance (ER honesty), i-frames 4f–18f, heavy plant exit.
 // bodyRot carries a true forward somersault; limbs tuck; cloak wraps.
 const ROLL_T = 26 * F, ROLL_DIST = 140;
@@ -341,7 +351,7 @@ export type KnightState =
   | "prelude" | "wake" | "idle" | "walk" | "sprint" | "skid"
   | "roll" | "backstep" | "act" | "charge" | "guard" | "parry"
   | "quieting" | "collapse" | "crawl" | "rise" | "embrace"
-  | "hit" | "sit";
+  | "hit" | "sit" | "jump";
 
 // what a player (or the QA harness) asks of the knight this frame
 export interface Intents {
@@ -351,11 +361,12 @@ export interface Intents {
   roll: boolean;
   guardHeld: boolean;
   parryTap: boolean;
+  jump: boolean;
 }
 export const NO_INTENT: Intents = {
   axis: 0, axisZ: 0, sprint: false, attackTap: false,
   heavyTap: false, heavyHeld: false, roll: false,
-  guardHeld: false, parryTap: false,
+  guardHeld: false, parryTap: false, jump: false,
 };
 
 // seated at the fire — legs folded, sword across the lap, head toward the flame
@@ -377,6 +388,12 @@ export class Knight {
   vx = 0; // knockback impulse velocity
   boundsL = 320; boundsR = 2100; // set per scene by the journey
   bandMin = BAND_MIN; bandMax = BAND_MAX; // the scene's designed depth band
+  h = 0;                         // height above the band's ground (jump only)
+  freeJump = false;              // the yard grants it; the journey authors it
+  private vh = 0;
+  private jumpVX = 0; private jumpVZ = 0; // takeoff momentum, carried honestly
+  private jumpAtkT = -1;         // ≥0 = the airborne cut is running
+  private airStrike: { x: number; z: number; zTol: number; reach: number; heavy: boolean; ring: boolean; loud: number; stop: number } | null = null;
   lightX = 1150;                 // key-light x — shadows point away (set per scene)
   wounds = 0;                    // 3 = collapse; read as breath + stance, never a bar
   reviveT = 0;                   // filled by a partner's embrace
@@ -421,6 +438,7 @@ export class Knight {
     this.x = x; this.z = 0; this.facing = 1; this.state = "prelude"; this.stateT = 0;
     this.cur = { ...LYING }; this.vx = 0; this.wakeDone = false;
     this.wounds = 0; this.reviveT = 0; this.act = null;
+    this.h = 0; this.vh = 0; this.jumpAtkT = -1; this.airStrike = null;
   }
 
   // ---- the depth band (M&C §18) ----
@@ -541,6 +559,7 @@ export class Knight {
     this.wounds++;
     this.hitFlash = 0.14;
     this.vx = -this.facing * 240;
+    if (this.state === "jump") { this.h = 0; this.vh = 0; this.jumpAtkT = -1; this.airStrike = null; } // struck from the air
     // §19 buffer honesty: a landed hit CLEARS every buffered intent —
     // no roll from beyond the grave (the Elden Ring lesson, research canon)
     this.chainBuf = 0; this.heavyBuf = 0; this.rollBuf = 0; this.rollAxisBuf = 0; this.rollAxisZBuf = 0;
@@ -571,6 +590,17 @@ export class Knight {
     if (this.mobile() || this.state === "guard") {
       if (this.rollBuf > 0) {
         this.startRollOrBackstep(ii.axis, ii.axisZ, fx);
+      } else if (ii.jump && this.freeJump && this.state !== "guard") {
+        // the gap verb (§1.5): takeoff keeps the stride's momentum, honestly
+        const mag = Math.hypot(ii.axis, ii.axisZ);
+        const inv2 = mag > 1 ? 1 / mag : 1;
+        const ground = this.state === "sprint" ? SPRINT_SPEED * 0.8 : WALK_SPEED * 0.85;
+        this.jumpVX = ground * ii.axis * inv2;
+        this.jumpVZ = ground * DEPTH_SPEED * ii.axisZ * inv2;
+        this.state = "jump"; this.stateT = 0;
+        this.vh = JUMP_V; this.h = 0; this.jumpAtkT = -1; this.airStrike = null;
+        this.noise = 2.2; this.noiseT = t;
+        fx.dust(this.x, this.groundY() - 2, 4, -this.facing * 0.3);
       } else if (ii.heavyTap && this.state !== "guard") {
         this.state = "charge"; this.stateT = 0; this.heavyBuf = 0;
         // facing locks toward the stick if it speaks, else stays
@@ -705,6 +735,40 @@ export class Knight {
         if (this.stateT >= ROLL_T) {
           if (this.chainBuf > 0) this.startAct(ROLLATK);
           else { this.state = "idle"; this.stateT = 0; }
+        }
+        break;
+      }
+      case "jump": {
+        // §18: ground (x,z) + height h; air steer is damped 0.4× — momentum is honest
+        this.h += this.vh * dt;
+        this.vh -= GRAV * dt;
+        this.x += (this.jumpVX + WALK_SPEED * 0.4 * ii.axis) * dt;
+        this.z += (this.jumpVZ + WALK_SPEED * DEPTH_SPEED * 0.4 * ii.axisZ) * dt;
+        // the airborne cut (§10 jump attack) — one per flight, gathered overhead
+        if (this.jumpAtkT < 0 && this.chainBuf > 0) {
+          this.jumpAtkT = 0; this.chainBuf = 0;
+          this.noise = 3.2; this.noiseT = t;
+        }
+        if (this.jumpAtkT >= 0) {
+          const prev = this.jumpAtkT;
+          this.jumpAtkT += dt;
+          if (prev < 6 * F && this.jumpAtkT >= 6 * F) { // fires exactly once, at the cut
+            this.airStrike = { x: this.x + this.facing * 56, z: this.z, zTol: Z_TOL, reach: 84, heavy: false, ring: false, loud: 3.4, stop: 3 * F };
+          }
+          target = this.jumpAtkT < 6 * F ? { ...JUMPATK_WIND } : { ...JUMPATK_CUT };
+          rate = 26;
+        } else {
+          target = this.vh > 40 ? { ...JUMP_RISE } : { ...JUMP_FALL };
+          rate = 14;
+        }
+        if (this.h <= 0 && this.vh < 0) {
+          // landing settles like the sprint stop — plant, dust, cloak overtakes
+          const cutLanding = this.jumpAtkT >= 0;
+          this.h = 0; this.vh = 0;
+          this.state = "skid"; this.stateT = 0;
+          this.jumpAtkT = -1;
+          this.noise = 2.6; this.noiseT = t;
+          fx.dust(this.x, this.groundY() - 2, cutLanding ? 8 : 5, this.facing * 0.4);
         }
         break;
       }
@@ -946,6 +1010,7 @@ export class Knight {
     if (this.state === "walk") return WALK_SPEED * this.facing;
     if (this.state === "sprint") return SPRINT_SPEED * this.facing; // full trail (§4)
     if (this.state === "roll") return 300 * this.moveDir;
+    if (this.state === "jump") return this.jumpVX; // the cloak rides the arc
     return this.vx;
   }
 
@@ -954,7 +1019,7 @@ export class Knight {
     // cloak attach point in WORLD space (cloak sim is world-space)
     const pts = this.compute();
     const s = this.zScale();
-    return { cloakX: this.x + pts.cloak[0] * this.facing * s, cloakY: this.groundY() + pts.cloak[1] * s };
+    return { cloakX: this.x + pts.cloak[0] * this.facing * s, cloakY: this.groundY() - this.h * s + pts.cloak[1] * s };
   }
 
   compute() {
@@ -1006,24 +1071,27 @@ export class Knight {
     this.limbIdx = 0; // stable per-limb variation each frame
     const s = this.zScale();
     ctx.save();
-    // §18: the band offsets the feet line and breathes the scale, anchored at the feet
-    ctx.translate(this.x, this.groundY());
+    // §18: the band offsets the feet line and breathes the scale, anchored at the
+    // feet; height h lifts the body while the shadow stays on the ground below
+    ctx.translate(this.x, this.groundY() - this.h * s);
     ctx.scale(this.facing * s, s);
 
     // long shadow thrown away from the sun (cinematic key light)
     const lowY = Math.max(p.ftF[1], p.ftN[1], p.pel[1] + 8);
     const feetX = (p.ftF[0] + p.ftN[0]) / 2;
     const shadowDir = (this.x >= this.lightX ? 1 : -1) * this.facing; // world dir → local
-    ctx.globalAlpha = 0.16;
+    const shadowY = (this.h > 0 ? this.h - 2 : Math.min(-2, lowY + 6)); // pinned to earth (§18)
+    const shrink = 1 / (1 + this.h * 0.008); // the landing mark, smaller from height
+    ctx.globalAlpha = 0.16 * shrink;
     ctx.fillStyle = "#020302";
     ctx.beginPath();
-    ctx.ellipse(feetX + shadowDir * 42, Math.min(-2, lowY + 6), 58, 5.5, 0, 0, TAU);
+    ctx.ellipse(feetX + shadowDir * 42, shadowY, 58 * shrink, 5.5 * shrink, 0, 0, TAU);
     ctx.fill();
-    // contact shadow
-    ctx.globalAlpha = 0.35;
+    // contact shadow — the only depth instrument the player gets
+    ctx.globalAlpha = 0.35 * (0.55 + 0.45 * shrink);
     ctx.fillStyle = "#030403";
     ctx.beginPath();
-    ctx.ellipse(feetX, Math.min(-2, lowY + 6), 34, 7, 0, 0, TAU);
+    ctx.ellipse(feetX, shadowY, 34 * shrink, 7 * shrink, 0, 0, TAU);
     ctx.fill();
     ctx.globalAlpha = 1;
 
@@ -1074,12 +1142,12 @@ export class Knight {
   swordTipWorld(): [number, number] {
     const p = this.compute();
     const s = this.zScale();
-    return [this.x + p.tip[0] * this.facing * s, this.groundY() + p.tip[1] * s];
+    return [this.x + p.tip[0] * this.facing * s, this.groundY() - this.h * s + p.tip[1] * s];
   }
   swordGuardWorld(): [number, number] {
     const p = this.compute();
     const s = this.zScale();
-    return [this.x + p.guard[0] * this.facing * s, this.groundY() + p.guard[1] * s];
+    return [this.x + p.guard[0] * this.facing * s, this.groundY() - this.h * s + p.guard[1] * s];
   }
   attackSmearActive(): boolean {
     if (this.state !== "act" || !this.act) return false;
@@ -1088,6 +1156,7 @@ export class Knight {
   // fires EXACTLY ONCE per act, at the strike frame — main.ts resolves the hit
   private strikeConsumed = false;
   strikeEvent(): { x: number; z: number; zTol: number; reach: number; heavy: boolean; ring: boolean; loud: number; stop: number } | null {
+    if (this.airStrike) { const s = this.airStrike; this.airStrike = null; return s; } // the falling cut (§18)
     if (this.state !== "act" || !this.act) { this.strikeConsumed = false; return null; }
     if (this.strikeConsumed || this.stateT < this.act.impact) return null;
     this.strikeConsumed = true;
@@ -1340,7 +1409,7 @@ export class Knight {
     const s = this.zScale();
     ctx.save();
     ctx.scale(this.facing / s, 1 / s); // undo flip + band scale (cloak sim is world-space)
-    ctx.translate(-this.x, -this.groundY());
+    ctx.translate(-this.x, -(this.groundY() - this.h * s));
     ctx.fillStyle = "#0c0912";
     ctx.beginPath();
     const w = (i: number) => 7 + (i / (CLOAK_N - 1)) * 13;

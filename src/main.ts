@@ -65,6 +65,7 @@ function enterScene(idx: number, freshKnights: boolean) {
     if (!k) continue;
     k.boundsL = scene.boundsL; k.boundsR = scene.boundsR;
     k.bandMin = bandN; k.bandMax = bandF;
+    k.freeJump = scene.id === YARD.id; // the journey authors its jumps; the yard grants them
     k.lightX = scene.lightX;
     if (freshKnights) {
       k.resetToLying(scene.spawnX + (k === knights[1] ? 70 : 0));
@@ -97,6 +98,7 @@ function joinP2() {
   const k = new Knight(clamp(p1.x + 80, scene.boundsL, scene.boundsR));
   k.boundsL = scene.boundsL; k.boundsR = scene.boundsR; k.lightX = scene.lightX;
   k.bandMin = scene.bandMin ?? BAND_MIN; k.bandMax = scene.bandMax ?? BAND_MAX;
+  k.freeJump = scene.id === YARD.id;
   k.resetToLying(k.x);
   k.z = clamp(p1.z + 12, k.bandMin, k.bandMax); // wakes beside, a step into the band
   k.startWake(); // P2 does not join a lobby. P2 wakes up.
@@ -118,6 +120,7 @@ let titleSkipped = skipTitle;
 let whisperT = -1;
 let debugOn = false;
 let lastInputT = 0; // the repose: stillness invites the wide painting (M&C §1.5)
+let combatT = 0;    // §20 context camera: eases 0→1 while the Stirred threaten
 let lastDualT = -1e9; // last dual-parry (so one catch can't retrigger the full breath)
 let timeScale = 1;    // QA-only slow motion (animation arc review); never shipped UI
 let resetPending = false; // every knight down → re-dream this chapter from its start
@@ -154,7 +157,7 @@ declare global {
       rest: (held: boolean) => void; skipToScene: (id: number) => void; x: () => number;
       z: () => number; walkz: (az: number) => void;
       // Phase 2a QA hooks (real keys are still the law for proof captures)
-      tap: (n: "attack" | "heavy" | "roll" | "parry") => void;
+      tap: (n: "attack" | "heavy" | "roll" | "parry" | "jump") => void;
       sprint: (b: boolean) => void; guard: (b: boolean) => void;
       heavyHold: (b: boolean) => void; quiet: () => void;
       collapse: () => void; collapse2: () => void; wounds: () => number;
@@ -192,6 +195,7 @@ window.__somnium = {
     if (n === "attack") forcedTap.attackTap = true;
     else if (n === "heavy") forcedTap.heavyTap = true;
     else if (n === "roll") forcedTap.roll = true;
+    else if (n === "jump") forcedTap.jump = true;
     else forcedTap.parryTap = true;
   },
   sprint: (b) => { forcedSprint = b; },
@@ -248,6 +252,7 @@ function knightInput(k: Knight, partner: Knight | null, inp: PlayerInput, dt: nu
     roll: (inp.rollPressed() || !!(forced && forcedTap.roll)) && !(nearFire && stationary && held),
     guardHeld: inp.guardHeld() || (forced && forcedGuard),
     parryTap: inp.parryPressed() || !!(forced && forcedTap.parryTap),
+    jump: inp.jumpPressed() || !!(forced && forcedTap.jump),
   };
   if (forced) forcedTap = {};
   k.update(dt, ii, t, fx);
@@ -475,10 +480,23 @@ function sim(dt: number) {
     const reposing = t - lastInputT > 4 && p1.state === "idle" && (!k2 || k2.state === "idle" || k2.state === "sit");
     // §4: sprint widens the frame ~4% — the world rushes, the knight shrinks in it
     const anySprint = p1.sprinting || (k2 ? k2.sprinting : false);
-    const fitZoom = spread > 10 ? (cw * 0.55) / (vs * Math.max(spread, 1)) : ZOOM_MID;
-    let targetZoom = (clamp(Math.min(ZOOM_MID, fitZoom), 0.74, ZOOM_MID) + Math.sin(t * 0.5) * 0.006)
+    // §20 THE CONTEXT CAMERA — combat eases ~7% closer over 1.5s (readability, not
+    // drama); leaves slower than it arrives; fit-both-knights ALWAYS wins the zoom
+    combatT = clamp(combatT + (shades.some((s) => s.threatening) ? dt / 1.5 : -dt / 2.6), 0, 1);
+    const combatEase = easeInOutCubic(combatT);
+    const zoomHi = ZOOM_MID * (1 + 0.07 * combatEase);
+    const fitZoom = spread > 10 ? (cw * 0.55) / (vs * Math.max(spread, 1)) : zoomHi;
+    let targetZoom = (clamp(Math.min(zoomHi, fitZoom), 0.74, zoomHi) + Math.sin(t * 0.5) * 0.006)
       * (reposing ? 0.92 : 1) * (anySprint ? 0.96 : 1);
     let targetX = (minX + maxX) / 2 + (present.length > 1 ? 0 : p1.facing * 46);
+    // the frame leans toward the fight's centroid — the knights stay the subject
+    if (combatEase > 0.01) {
+      const live = shades.filter((s) => s.threatening);
+      if (live.length > 0) {
+        const fightX = live.reduce((a, s) => a + s.x, 0) / live.length;
+        targetX = lerp(targetX, (targetX * 2 + fightX) / 3, 0.5 * combatEase);
+      }
+    }
     // §5 camera law: the reveal is LOCKED WIDE — both knights and his full height
     if (awake && awake.dramatic) {
       targetZoom = 0.74;

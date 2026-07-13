@@ -59,14 +59,21 @@ _Order chosen so every step is provable in the yard before it touches the journe
       the Bound Post (felt thud, wobble spring, knitting dents, takes hitstop), Digit1
       spawn sparring Stirred / Digit0 settle, whisper "practice, quietly". 158fps.
       Probe: scripts/yard-probe.mjs.
-- [ ] 2.75c. Chain flow §19: end-pose contract L1→L2→L3→heavy-finisher slot, chained
-      anticipation ≈60%, buffer-clear-on-hit, buffers-open-through-hitstop, ≤3f first response
-- [ ] 2.75d. Depth combat: z-tolerance on strike events (generous), hurt-band narrowing
-      while depth-moving, depth-aim roll (circling), Stirred z-alignment AI + kin repulsion
-- [ ] 2.75e. Context camera §20: COMBAT state (+7% ease-in, centroid bias, fit-both wins),
-      mental-map law, 1.5s blends; BOSS state already law
-- [ ] 2.75f. Traversal verbs (yard-proven, then placed): jump(gap) w/ shadow-telegraphed
-      landing + jump/falling attacks; slide (downhill + under + slide-attack); vault; mantle
+- [x] 2.75c. Chain flow §19 ✅ 2026-07-12 (commit 84037bb, proof docs/depth/chain-*/fin-*):
+      L2/L3 first keys = previous cut's follow-through (L1_FOLLOW/L2_FOLLOW consts) — the
+      sentence gathers, never resets; buffered heavy-finisher slot (heavyBuf 0.18s,
+      m.heavyFrom; L3 grants it after the held cover frame only); ALL buffers clear on hit.
+- [x] 2.75d. Depth combat ✅ — landed inside 2.75a (z-tol strikes, hurtZ narrowing,
+      circling roll, Shade alignment + repulsion). No separate work remained.
+- [x] 2.75e. Context camera §20 ✅ 2026-07-12: combatT eases in 1.5s / out 2.6s,
+      zoom ×1.07 toward the fight centroid, fit-both-knights always wins; boss lock intact.
+- [x] 2.75f. Jump ✅ 2026-07-12 (proof docs/depth/j1–j3): Space/pad-Y, (x,z)+h arc
+      (JUMP_V 280 / GRAV 880 ≈ 45px peak, 38f), takeoff momentum carried + 0.4× air steer,
+      grounded shrinking shadow = landing telegraph, airborne cut (6f gather → falling
+      strike, one per flight), lands into the 6f settle; **freeJump = yard only — the
+      journey's jumps stay authored** (Space in journey = nothing, probe-verified).
+      REMAINING (moved to 2.75h): slide (S2 hill / S5 drifts), slide-under, vault, mantle —
+      authored set-piece verbs, built with their journey geometry per §1.5.
 - [ ] 2.75g. Roster §21 (each = approaches→critique→synthesize per Review Board):
       the Sealed → the Startled → the Crier → the Burdened → the Remembered
 - [ ] 2.75h. Journey integration: bands + sparse variant placement per scene (S1 teacher
