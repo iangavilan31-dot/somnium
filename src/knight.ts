@@ -28,7 +28,7 @@ const POSE_KEYS = [
   "shL", "elL", "shR", "elR", "hipL", "shinL", "hipR", "shinR", "sword",
 ] as const;
 
-function P(deg: Partial<Record<keyof Pose, number>>): Pose {
+export function P(deg: Partial<Record<keyof Pose, number>>): Pose {
   // author in degrees (px fields pass through)
   const base: Pose = {
     pelvisX: 0, pelvisY: STAND_PELVIS, bodyRot: 0, torso: 5, head: 0,
@@ -47,7 +47,7 @@ function P(deg: Partial<Record<keyof Pose, number>>): Pose {
 const IDLE = P({});
 
 // ---- keyframe timelines ----
-interface Key { t: number; pose: Pose; ease: Ease }
+export interface Key { t: number; pose: Pose; ease: Ease }
 
 const LYING = P({
   pelvisX: 0, pelvisY: 13, bodyRot: 84, torso: 8, head: 20,
@@ -85,6 +85,7 @@ interface Move {
   lunge: number;    // forward px carried through the strike (momentum honesty)
   dust: number;     // painted flecks at impact
   loud: number;     // ATTENTION-IS-NOISE value (consumed in Phase 2b)
+  stop: number;     // §10 hitstop, applied ONLY when the strike lands
 }
 
 // L1 — THE DESCENDING CUT. 8f anticip · 3f strike · 12f follow. Cancel: impact+2f.
@@ -98,7 +99,7 @@ const L1: Move = {
     { t: 23 * F, pose: IDLE, ease: easeInOutCubic },
   ],
   impact: 8 * F, strikeEnd: 11 * F, total: 23 * F, cancelFrom: 13 * F,
-  chain: "L2", lunge: 10, dust: 6, loud: 3,
+  chain: "L2", lunge: 10, dust: 6, loud: 3, stop: 2 * F,
 };
 
 // L2 — THE CROSS. 6f anticip · 3f strike · 12f follow. Coil across the body,
@@ -113,7 +114,7 @@ const L2: Move = {
     { t: 21 * F, pose: IDLE, ease: easeInOutCubic },
   ],
   impact: 6 * F, strikeEnd: 9 * F, total: 21 * F, cancelFrom: 11 * F,
-  chain: "L3", lunge: 12, dust: 6, loud: 3,
+  chain: "L3", lunge: 12, dust: 6, loud: 3, stop: 2 * F,
 };
 
 // L3 — THE RISING CUT (capstone). 12f anticip · 4f strike · 18f follow. Commit —
@@ -128,7 +129,7 @@ const L3: Move = {
     { t: 34 * F, pose: IDLE, ease: easeInOutCubic },
   ],
   impact: 12 * F, strikeEnd: 16 * F, total: 34 * F, cancelFrom: Infinity,
-  lunge: 14, dust: 9, loud: 3.4,
+  lunge: 14, dust: 9, loud: 3.4, stop: 3 * F,
 };
 
 // HEAVY — release of the charge. 4f strike · 20f follow. Overhead smash to the
@@ -142,7 +143,7 @@ const HEAVY: Move = {
     { t: 24 * F, pose: IDLE, ease: easeInOutCubic },
   ],
   impact: 0, strikeEnd: 4 * F, total: 24 * F, cancelFrom: Infinity,
-  lunge: 18, dust: 12, loud: 4,
+  lunge: 18, dust: 12, loud: 4, stop: 4 * F,
 };
 
 // RUNNING ATTACK — 6f sprint-cancel · 4f strike · 16f follow. A cross-slash
@@ -157,7 +158,7 @@ const RUNATK: Move = {
     { t: 26 * F, pose: IDLE, ease: easeInOutCubic },
   ],
   impact: 6 * F, strikeEnd: 10 * F, total: 26 * F, cancelFrom: 18 * F,
-  lunge: 26, dust: 8, loud: 3.6,
+  lunge: 26, dust: 8, loud: 3.6, stop: 3 * F,
 };
 
 // ROLLING ATTACK — 4f out of the roll's plant · 3f strike · 14f follow.
@@ -171,7 +172,7 @@ const ROLLATK: Move = {
     { t: 21 * F, pose: IDLE, ease: easeInOutCubic },
   ],
   impact: 4 * F, strikeEnd: 7 * F, total: 21 * F, cancelFrom: Infinity,
-  lunge: 12, dust: 7, loud: 3.2,
+  lunge: 12, dust: 7, loud: 3.2, stop: 2 * F,
 };
 
 // BACKSTEP POKE — 5f · 2f · 10f. A straight thrust out of the backstep;
@@ -185,7 +186,7 @@ const POKE: Move = {
     { t: 17 * F, pose: IDLE, ease: easeInOutCubic },
   ],
   impact: 5 * F, strikeEnd: 7 * F, total: 17 * F, cancelFrom: 9 * F,
-  lunge: 8, dust: 4, loud: 2.8,
+  lunge: 8, dust: 4, loud: 2.8, stop: 1 * F,
 };
 
 const MOVES: Record<string, Move> = { L1, L2, L3, HEAVY, RUNATK, ROLLATK, POKE };
@@ -288,7 +289,7 @@ const QUIETING: Key[] = [
   { t: 2.8, pose: IDLE, ease: easeInOutCubic },
 ];
 
-function sampleTimeline(keys: Key[], t: number): Pose {
+export function sampleTimeline(keys: Key[], t: number): Pose {
   if (t <= keys[0].t) return keys[0].pose;
   for (let i = 1; i < keys.length; i++) {
     if (t <= keys[i].t) {
@@ -303,7 +304,7 @@ function sampleTimeline(keys: Key[], t: number): Pose {
 }
 
 // ---- 2-bone leg IK (absolute angles from straight-down) ----
-function legIK(hipX: number, hipY: number, footX: number, footY: number): [number, number] {
+export function legIK(hipX: number, hipY: number, footX: number, footY: number): [number, number] {
   const dx = footX - hipX, dy = footY - hipY;
   const d = clamp(Math.hypot(dx, dy), 6, THIGH + SHIN - 0.5);
   const phi = Math.atan2(dx, dy);
@@ -447,9 +448,10 @@ export class Knight {
       fx.dust(this.x + this.facing * 6, GROUND_Y - 2, 3, this.facing * 0.6);
     }
   }
-  startQuieting() {
-    if (this.busy() && this.state !== "guard") return;
+  startQuieting(): boolean {
+    if (this.busy() && this.state !== "guard") return false;
     this.state = "quieting"; this.stateT = 0;
+    return true;
   }
   startRise(soloRally = false) {
     if (this.state !== "crawl" && this.state !== "collapse") return;
@@ -477,18 +479,26 @@ export class Knight {
     }
   }
 
-  tryHit(fx: Fx, heavy = false) {
-    if (this.state === "wake" || this.state === "prelude" || this.state === "rise") return;
-    if (this.state === "collapse" || this.state === "crawl") return;
-    if (this.state === "quieting") return; // a vow is kept (§13) — provisional until 2b
-    if (this.invulnerable) return;         // honest i-frames (ER law)
+  // ATTENTION IS NOISE (§14): the world hears a decaying envelope of the last act
+  loudness(tNow: number): number {
+    const base = this.state === "sprint" ? 2 : this.state === "walk" ? 1
+      : this.state === "crawl" ? 0.4 : 0.15;
+    const impulse = this.noise * Math.exp(-(tNow - this.noiseT) / 1.4);
+    return Math.max(base, impulse);
+  }
+
+  tryHit(fx: Fx, heavy = false): "immune" | "parried" | "blocked" | "hit" | "downed" {
+    if (this.state === "wake" || this.state === "prelude" || this.state === "rise") return "immune";
+    if (this.state === "collapse" || this.state === "crawl") return "immune";
+    if (this.state === "quieting") return "immune"; // a vow is kept (§13)
+    if (this.invulnerable) return "immune";         // honest i-frames (ER law)
     // the hush-parry catch — the strike is smothered, the world holds its breath
     if (this.parryOpen) {
       this.parryHold = 0.3;
       this.lastParryT = this.tNow;
       this.noise = 0.2; this.noiseT = this.tNow; // a parry is the QUIET answer
       fx.stall(0.3);
-      return;
+      return "parried";
     }
     // guard chips but holds against light blows; heavies break through
     if (this.state === "guard" && !heavy) {
@@ -496,7 +506,7 @@ export class Knight {
       this.guardJolt = 0.12;
       this.hitFlash = 0.06;
       fx.dust(this.x + this.facing * 24, GROUND_Y - 34, 3, this.facing * 0.4);
-      return;
+      return "blocked";
     }
     this.wounds++;
     this.hitFlash = 0.14;
@@ -505,9 +515,10 @@ export class Knight {
     fx.dust(this.x, GROUND_Y - 2, 6, -this.facing);
     if (this.wounds >= 3) {
       this.state = "collapse"; this.stateT = 0; this.soloDownT = 0;
-    } else {
-      this.state = "hit"; this.stateT = 0;
+      return "downed";
     }
+    this.state = "hit"; this.stateT = 0;
+    return "hit";
   }
 
   update(dt: number, ii: Intents, t: number, fx: Fx) {
@@ -1012,6 +1023,22 @@ export class Knight {
   attackSmearActive(): boolean {
     if (this.state !== "act" || !this.act) return false;
     return this.stateT >= this.act.impact - F && this.stateT <= this.act.strikeEnd + 2 * F;
+  }
+  // fires EXACTLY ONCE per act, at the strike frame — main.ts resolves the hit
+  private strikeConsumed = false;
+  strikeEvent(): { x: number; reach: number; heavy: boolean; ring: boolean; loud: number; stop: number } | null {
+    if (this.state !== "act" || !this.act) { this.strikeConsumed = false; return null; }
+    if (this.strikeConsumed || this.stateT < this.act.impact) return null;
+    this.strikeConsumed = true;
+    const heavy = this.act === MOVES.HEAVY;
+    return {
+      x: this.x + this.facing * (66 + this.act.lunge),
+      reach: 92,
+      heavy,
+      ring: heavy, // a heavy digs the earth — every whiffed heavy IS the Ring (§14 v1 form)
+      loud: this.act.loud + this.heavyCharge,
+      stop: this.act.stop,
+    };
   }
 
   private limbIdx = 0;

@@ -9,6 +9,7 @@ import { Fx } from "./fx";
 import { InputHub, type PlayerInput } from "./input";
 import { drawDebug, type Perf } from "./debug";
 import { Campfire, SCENES, type SceneBake, type SceneDef } from "./journey";
+import { Shade, SHADE_SPAWNS } from "./stirred";
 import "./scenes/index"; // registers scenes 2+ into SCENES
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
@@ -47,6 +48,8 @@ function enterScene(idx: number, freshKnights: boolean) {
   bake = bakes.get(scene.id)!;
   fire = scene.fireX != null ? new Campfire(scene.fireX) : null;
   fx.setScene(scene.id);
+  shades = (SHADE_SPAWNS[scene.id] ?? []).map((x) => new Shade(x));
+  hushBeatArmed = shades.length > 0;
   for (const k of knights) {
     if (!k) continue;
     k.boundsL = scene.boundsL; k.boundsR = scene.boundsR;
@@ -63,6 +66,11 @@ function enterScene(idx: number, freshKnights: boolean) {
 // ---------- knights ----------
 const knights: (Knight | null)[] = [new Knight(SCENES[0].spawnX), null];
 const p1 = knights[0]!;
+
+// ---------- the Stirred ----------
+let shades: Shade[] = [];
+let hitstopT = 0;        // §10: applied only when a strike LANDS
+let hushBeatArmed = false; // the 2s held breath when the LAST one settles (§9 canon)
 
 function joinP2() {
   if (knights[1]) return;
@@ -85,6 +93,7 @@ let debugOn = false;
 let lastInputT = 0; // the repose: stillness invites the wide painting (M&C §1.5)
 let lastDualT = -1e9; // last dual-parry (so one catch can't retrigger the full breath)
 let timeScale = 1;    // QA-only slow motion (animation arc review); never shipped UI
+let resetPending = false; // every knight down → re-dream this chapter from its start
 
 // scene transition (the world re-dreams forward)
 let trans: "none" | "out" | "in" = skipTitle ? "none" : "none";
@@ -122,6 +131,7 @@ declare global {
       heavyHold: (b: boolean) => void; quiet: () => void;
       collapse: () => void; collapse2: () => void; wounds: () => number;
       slow: (f: number) => void; sx: (p2?: boolean) => number;
+      shades: () => string;
     };
   }
 }
@@ -165,6 +175,7 @@ window.__somnium = {
     const vs = Math.max(cw / 1920, ch / 1080);
     return (cw / 2 + (k.x - cam.x) * vs * cam.zoom) / dpr;
   },
+  shades: () => shades.map((s) => `${s.state}@${Math.round(s.x)}p${s.posture}d${s.dents}`).join("|"),
 };
 
 const perf: Perf = { fps: 60, simMs: 0, renderMs: 0 };
@@ -183,6 +194,12 @@ function knightInput(k: Knight, partner: Knight | null, inp: PlayerInput, dt: nu
   // ONE held gesture, two meanings: tend a fallen partner first, else rest at the fire
   const partnerDown = !!partner && partner.downed && Math.abs(k.x - partner.x) < 56;
   k.setEmbrace(partnerDown && held && stationary, partner ? partner.x : k.x);
+  // THE QUIETING (§13): the same tend-gesture, aimed at a staggered Stirred —
+  // rest, revive, still: one gesture family, three mercies
+  if (held && stationary && (k.state === "idle" || k.state === "walk")) {
+    const q = shades.find((s) => s.staggered && Math.abs(s.x - k.x) < 64);
+    if (q && k.startQuieting()) q.beginQuieting();
+  }
   k.setRest(held && nearFire && stationary && !partnerDown, fire ? fire.x : k.x);
   const ii: Intents = {
     axis: k.sitting || k.state === "embrace" ? 0 : axis,
@@ -224,11 +241,55 @@ function sim(dt: number) {
 
   const playable = p1.wakeDone && trans === "none";
   const k2 = knights[1];
-  if (playable) knightInput(p1, k2, hub.p1, dt, true);
-  else p1.update(dt, NO_INTENT, t, fx);
+  // §10 hitstop: actors freeze for the blow's weight; input still lands in buffers
+  const adt = hitstopT > 0 ? 0 : dt;
+  if (hitstopT > 0) hitstopT -= dt;
+  if (playable) knightInput(p1, k2, hub.p1, adt, true);
+  else p1.update(adt, NO_INTENT, t, fx);
   if (k2) {
-    if (trans === "none") knightInput(k2, p1, hub.p2, dt, false);
-    else k2.update(dt, NO_INTENT, t, fx);
+    if (trans === "none") knightInput(k2, p1, hub.p2, adt, false);
+    else k2.update(adt, NO_INTENT, t, fx);
+  }
+
+  // ---- the Stirred: strikes resolve, attention shifts, silence returns ----
+  for (const k of [p1, k2]) {
+    if (!k) continue;
+    const ev = k.strikeEvent();
+    if (!ev) continue;
+    let landed = false;
+    for (const s of shades) {
+      if (!s.alive) continue;
+      if (Math.abs(s.x - ev.x) < ev.reach) {
+        if (s.struck(ev.heavy, k.x, fx) !== "glance") landed = true;
+      }
+    }
+    if (landed) hitstopT = Math.max(hitstopT, ev.stop);
+    if (ev.ring) { k.noise = Math.max(k.noise, 5); k.noiseT = t; } // the unlawful bell
+    fx.notifyNoise(k.x, ev.loud + (landed ? 0.5 : 0)); // the ravens answer
+  }
+  for (const s of shades) {
+    const sev = s.strikeEvent();
+    if (sev) {
+      for (const k of [p1, k2]) {
+        if (!k || Math.abs(k.x - sev.x) >= sev.reach) continue;
+        const out = k.tryHit(fx);
+        if (out === "parried") s.stall(); // its ink caught mid-stroke (§11)
+        else if (out === "hit" || out === "downed") hitstopT = Math.max(hitstopT, 3 / 60);
+      }
+    }
+    s.update(adt, t, knights, fx, fire ? fire.x : null);
+  }
+  // when the LAST accident of noise is un-had, the world holds its breath (§9)
+  if (hushBeatArmed && shades.length > 0 && shades.every((s) => !s.alive)) {
+    hushBeatArmed = false;
+    fx.stall(2.0);
+  }
+  // every knight down → the dream takes them back to the chapter's opening
+  const p1Down = p1.downed || p1.state === "collapse";
+  const k2Down = !k2 || k2.downed || k2.state === "collapse";
+  if (playable && p1Down && k2Down && !resetPending) {
+    resetPending = true;
+    beginTransition();
   }
 
   // the embrace fills the fallen knight's rise; letting go interrupts it
@@ -266,7 +327,10 @@ function sim(dt: number) {
   if (trans !== "none") {
     transT += dt;
     if (trans === "out" && transT >= TRANS_S) {
-      if (sceneIdx + 1 < SCENES.length) {
+      if (resetPending) {
+        resetPending = false;
+        enterScene(sceneIdx, true); // wake again at the last fire's chapter
+      } else if (sceneIdx + 1 < SCENES.length) {
         enterScene(sceneIdx + 1, true);
       } else {
         // "And waking up." — the journey ends where dreams do. Cut to title.
@@ -378,6 +442,7 @@ function render() {
   ctx.scale(s, s);
   fx.draw(ctx);
   fire?.draw(ctx, GROUND_Y, fireGlow, t);
+  for (const s of shades) s.draw(ctx, t); // the Stirred stand behind the living
   for (const k of knights) k?.draw(ctx);
   ctx.restore();
 

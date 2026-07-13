@@ -116,6 +116,54 @@ export class Fx {
     this.smears.push({ tx, ty, gx, gy, age: 0 });
   }
 
+  // SOUND-EATERS: ravens answer a great noise — they bank toward it, take one
+  // slow circle over the ring, and carry it away (§12: the heaviest impacts are
+  // punctuated by a bird, never a bigger flash). Also spawns a flight if the
+  // sky happens to be empty — the world ALWAYS hears an unlawful bell.
+  private noiseX = -1; private noiseT2 = 0;
+  notifyNoise(x: number, loud: number) {
+    if (loud < 3.5) return;
+    this.noiseX = x; this.noiseT2 = 2.6;
+    if (this.birds.length === 0) {
+      const fromLeft = x > WORLD_W / 2;
+      for (let i = 0; i < 2; i++) {
+        this.birds.push({
+          x: fromLeft ? -40 - i * 30 : WORLD_W + 40 + i * 30,
+          y: 300 + this.R() * 120,
+          vx: (fromLeft ? 1 : -1) * (70 + this.R() * 20),
+          flap: this.R() * TAU,
+          size: 6 + this.R() * 4,
+        });
+      }
+    }
+  }
+
+  // the Stirred bleed INK and noise — never blood (§13)
+  inkSplash(x: number, y: number, dir: number, n: number) {
+    for (let i = 0; i < n; i++) {
+      this.parts.push({
+        x: x + (this.R() - 0.5) * 10, y: y - this.R() * 20,
+        vx: dir * (30 + this.R() * 70) + (this.R() - 0.5) * 50,
+        vy: -(40 + this.R() * 90),
+        age: 0, life: 0.4 + this.R() * 0.45,
+        size: 1.8 + this.R() * 3.4,
+        color: this.R() < 0.25 ? "#3d1622" : "#0a0714",
+      });
+    }
+  }
+  // steel glancing off Loud Age plate — pale directional sparks (§13 teach)
+  glance(x: number, y: number, dir: number) {
+    for (let i = 0; i < 5; i++) {
+      this.parts.push({
+        x, y: y - this.R() * 6,
+        vx: dir * (60 + this.R() * 130), vy: -(20 + this.R() * 70),
+        age: 0, life: 0.18 + this.R() * 0.2,
+        size: 1 + this.R() * 1.6,
+        color: this.R() < 0.5 ? "#c8b49a" : "#8a7460",
+      });
+    }
+  }
+
   // THE HELD BREATH (M&C §11): a successful hush-parry stops every ambient
   // particle — petals hang, motes freeze, embers pause mid-rise. One flag; free.
   private stallT = 0;
@@ -210,8 +258,15 @@ export class Fx {
         });
       }
     }
+    if (this.noiseT2 > 0) this.noiseT2 -= dt;
     for (let i = this.birds.length - 1; i >= 0; i--) {
       const b = this.birds[i];
+      // a heard noise bends the flight toward its source (sound-eaters feeding)
+      if (this.noiseT2 > 0 && Math.abs(b.x - this.noiseX) < 900) {
+        const want = Math.sign(this.noiseX - b.x) * (65 + Math.sin(b.flap) * 10);
+        b.vx += (want - b.vx) * Math.min(1, 1.6 * dt);
+        if (Math.abs(b.x - this.noiseX) < 120) b.vx = Math.sign(b.vx || 1) * 70; // overshoot: one pass, then away
+      }
       b.x += b.vx * dt;
       b.y += Math.sin(b.flap * 0.5) * 3 * dt;
       b.flap += dt * 9;

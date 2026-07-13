@@ -28,7 +28,21 @@ animation-first (GEEKED/RIFT WARDEN died ignoring it) · banned list absolute._
   Inputs: J/A light (fires on PRESS), I/RT charge heavy, K/B roll+sprint-hold, L/LB guard, O·;/RB parry.
   **Carried to 2b:** hitstop application when strikes land · dual-parry live test · kick (shove) · loudness aggro
   consumes knight.noise · solo-rally 6s is provisional death rule. Traversal verbs (jump/slide/mantle) = later, per BRIEF flag.
-- [ ] 2b. The Stirred (shade-knights/crows/stair-bats — painted smears, denting armor, hush-deaths + 2s held breath), ATTENTION-IS-NOISE aggro, the Ring, de-escalation, placed encounters per scene
+- [x] 2b. The Stirred ✅ 2026-07-12 (proof: docs/stirred/). src/stirred.ts: shade-knights = broken
+  mirrors of the player rig rendered as unstable ink (drifting edges, drips) over denting Loud Age
+  plate (seams leak; dents = dark bites). ATTENTION-IS-NOISE live: knight.loudness() envelope +
+  proximity whisper (<170px — plate creaks, §1) + fire ward (hearth = lawful quiet, rest ritual safe).
+  Loop proven with real keys: sprint-noise stirs → 24f telegraph → parry STALLS its ink (§11) →
+  lights glance off undented plate (heavy teach §13) → heavy dents → stagger → THE QUIETING = the
+  tend-gesture (rest/revive/still, one family) → settles to fading ink pool → last one gone =
+  2s world-breath. De-escalation: silence + distance walks it home, posture knits in sleep.
+  §10 hitstop lands only on hits (input still buffers at dt=0). Ring v1 = every whiffed heavy digs
+  the earth (loud 5); ravens bank toward any noise ≥3.5 (§12 punctuation). All-down death rule:
+  re-dream the chapter from its start. Spawns sparse: S1 [1900] teacher · S2 [1300,1660] singles ·
+  S4 [1310,1530] pair. Journey regression green WITH live encounters.
+  **Carried:** crows/bats as true swoopers (currently ambient + noise-answering) · joint quieting for
+  large Stirred · dual-parry + toll-sync live tests (need 2 pads → Ian) · S4 shade-vs-black-stone
+  palette check (4b) · stagger posture-knit tuning after pad feel.
 
 ## Phase 3 — THE FIRST AWAKE
 - [ ] Reveal (statue → ear → stands and stands), 3 phases (Watch/Fear/Memory + he-waits), hour-toll, Boss Law five beats, kneel-death, mute bell swing, window acknowledgment
