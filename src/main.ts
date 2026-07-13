@@ -10,6 +10,7 @@ import { InputHub, type PlayerInput } from "./input";
 import { drawDebug, type Perf } from "./debug";
 import { Campfire, SCENES, type SceneBake, type SceneDef } from "./journey";
 import { Shade, SHADE_SPAWNS } from "./stirred";
+import { FirstAwake, AWAKE_X, FLOOR_L, FLOOR_R } from "./awake";
 import "./scenes/index"; // registers scenes 2+ into SCENES
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
@@ -50,6 +51,8 @@ function enterScene(idx: number, freshKnights: boolean) {
   fx.setScene(scene.id);
   shades = (SHADE_SPAWNS[scene.id] ?? []).map((x) => new Shade(x));
   hushBeatArmed = shades.length > 0;
+  awake = scene.id === 5 ? new FirstAwake() : null;
+  tollAcc = 0;
   for (const k of knights) {
     if (!k) continue;
     k.boundsL = scene.boundsL; k.boundsR = scene.boundsR;
@@ -71,6 +74,10 @@ const p1 = knights[0]!;
 let shades: Shade[] = [];
 let hitstopT = 0;        // §10: applied only when a strike LANDS
 let hushBeatArmed = false; // the 2s held breath when the LAST one settles (§9 canon)
+
+// ---------- THE FIRST AWAKE (scene 5) ----------
+let awake: FirstAwake | null = null;
+let tollAcc = 0; // walked distance on the buried floor since the last toll
 
 function joinP2() {
   if (knights[1]) return;
@@ -132,6 +139,7 @@ declare global {
       collapse: () => void; collapse2: () => void; wounds: () => number;
       slow: (f: number) => void; sx: (p2?: boolean) => number;
       shades: () => string;
+      awake: () => string;
     };
   }
 }
@@ -176,6 +184,7 @@ window.__somnium = {
     return (cw / 2 + (k.x - cam.x) * vs * cam.zoom) / dpr;
   },
   shades: () => shades.map((s) => `${s.state}@${Math.round(s.x)}p${s.posture}d${s.dents}`).join("|"),
+  awake: () => (awake ? `${awake.state} t${awake.tolls}` : "none"),
 };
 
 const perf: Perf = { fps: 60, simMs: 0, renderMs: 0 };
@@ -284,6 +293,33 @@ function sim(dt: number) {
     hushBeatArmed = false;
     fx.stall(2.0);
   }
+
+  // ---- THE FIRST AWAKE: the knights' own footsteps toll the buried floor ----
+  if (awake) {
+    let anyOnFloor = false;
+    let nearestX: number | null = null;
+    for (const k of [p1, k2]) {
+      if (!k) continue;
+      const onFloor = k.x > FLOOR_L && k.x < FLOOR_R;
+      if (onFloor && !k.downed) {
+        anyOnFloor = true;
+        if (nearestX == null || Math.abs(k.x - AWAKE_X) < Math.abs(nearestX - AWAKE_X)) nearestX = k.x;
+        if (k.state === "walk" || k.state === "sprint") {
+          tollAcc += (k.state === "sprint" ? 268 : 150) * adt;
+          if (tollAcc > 62) {
+            tollAcc = 0;
+            fx.tollRing(k.x, GROUND_Y + 4);
+            awake.toll(t, k.state === "sprint" ? 2 : 1);
+          }
+        }
+        if (k.state === "roll" || k.state === "act") {
+          // steel and tumbling ring the bronze harder than any step
+          if (k.stateT < dt * 2) { fx.tollRing(k.x, GROUND_Y + 4); awake.toll(t, 2); }
+        }
+      }
+    }
+    awake.update(adt, t, nearestX, anyOnFloor, fx);
+  }
   // every knight down → the dream takes them back to the chapter's opening
   const p1Down = p1.downed || p1.state === "collapse";
   const k2Down = !k2 || k2.downed || k2.state === "collapse";
@@ -367,11 +403,16 @@ function sim(dt: number) {
     // §4: sprint widens the frame ~4% — the world rushes, the knight shrinks in it
     const anySprint = p1.sprinting || (k2 ? k2.sprinting : false);
     const fitZoom = spread > 10 ? (cw * 0.55) / (vs * Math.max(spread, 1)) : ZOOM_MID;
-    const targetZoom = (clamp(Math.min(ZOOM_MID, fitZoom), 0.74, ZOOM_MID) + Math.sin(t * 0.5) * 0.006)
+    let targetZoom = (clamp(Math.min(ZOOM_MID, fitZoom), 0.74, ZOOM_MID) + Math.sin(t * 0.5) * 0.006)
       * (reposing ? 0.92 : 1) * (anySprint ? 0.96 : 1);
+    let targetX = (minX + maxX) / 2 + (present.length > 1 ? 0 : p1.facing * 46);
+    // §5 camera law: the reveal is LOCKED WIDE — both knights and his full height
+    if (awake && awake.dramatic) {
+      targetZoom = 0.74;
+      targetX = lerp(targetX, (targetX + AWAKE_X) / 2, 0.75);
+    }
     cam.zoom = damp(cam.zoom, targetZoom, reposing ? 0.8 : 2.2, dt);
-    const lead = present.length > 1 ? 0 : p1.facing * 46;
-    cam.x = damp(cam.x, (minX + maxX) / 2 + lead, 3.2, dt);
+    cam.x = damp(cam.x, targetX, 3.2, dt);
     if (whisperT >= 0 || scene.id !== 1) { if (whisperT < 0) whisperT = 0; else whisperT += dt; }
   } else {
     cam.x = scene.spawnX - 50 + noise1(t * 0.1) * 6; // title drift
@@ -415,11 +456,22 @@ function render() {
     ctx.globalAlpha = 1;
   };
 
-  for (const l of bake.layers) drawLayer(l);
-
   // THE WORLD BREATHES (World Bible §1) — an ~8.5s swell of everything the world's
   // own light touches. Keeper-lights and fireflies keep their own time (Law 6).
   const breath = Math.pow(0.5 + 0.5 * Math.sin(t * ((Math.PI * 2) / 8.5)), 1.35);
+
+  bake.layers.forEach((l, li) => {
+    drawLayer(l);
+    // THE FIRST AWAKE sits INSIDE the plate stack, as the bake did — the near
+    // drift and the snowfield bury his knees (scene 5: after layer 3, drift-571)
+    if (awake && scene.id === 5 && li === 3) {
+      ctx.save();
+      ctx.translate(cx + (0 - cam.x) * s, gsY + (0 - GROUND_Y) * s);
+      ctx.scale(s, s);
+      awake.draw(ctx, t, breath);
+      ctx.restore();
+    }
+  });
   if (scene.veil) {
     const v = scene.veil;
     const skyCam = cam.x * v.parallax + (1 - v.parallax) * (WORLD_W / 2);

@@ -199,92 +199,6 @@ function s5Tower(): Layer {
   return { canvas: c, parallax: 0.28, yOff: 0 };
 }
 
-// THE FIRST AWAKE — kneeling, drifted over, facing west (toward the coming knights).
-// Baked as the statue he appears to be. Phase 3 replaces this with the living rig.
-function s5Colossus(): Layer {
-  const [c, ctx] = makeCanvas(600, 1060);
-  const R = mulberry32(541);
-  const KX = 1520, KB = 1006; // kneeling at the tower's foot, against the Ember's air
-  const S = 4.0; // kneeling height ≈ 265px — a hill that breathes; his hump must
-                 // crest the horizon and read against the sky (board: "snow boulder")
-
-  // the red mass first — pelt where the snow hasn't held
-  ctx.fillStyle = "#0f0b0e";
-  ctx.beginPath(); // whole silhouette: haunches, hunched back, low head, down horns
-  ctx.moveTo(KX - 60 * S * 0.35, KB);
-  ctx.quadraticCurveTo(KX - 26 * S, KB - 30 * S, KX - 20 * S, KB - 48 * S); // haunch
-  ctx.quadraticCurveTo(KX - 12 * S, KB - 66 * S, KX + 6 * S, KB - 64 * S);  // shoulder mountain
-  ctx.quadraticCurveTo(KX + 22 * S, KB - 60 * S, KX + 26 * S, KB - 44 * S); // hunched neck
-  ctx.quadraticCurveTo(KX + 34 * S, KB - 36 * S, KX + 30 * S, KB - 26 * S); // lowered head
-  ctx.quadraticCurveTo(KX + 26 * S, KB - 16 * S, KX + 18 * S, KB - 12 * S); // muzzle down
-  ctx.lineTo(KX + 16 * S, KB);
-  ctx.closePath();
-  ctx.fill();
-  // the down-swept horns — he lowers his head to LISTEN, not to charge
-  ctx.strokeStyle = "#0d0a0c";
-  ctx.lineCap = "round";
-  ctx.lineWidth = 6.5 * S * 0.5;
-  ctx.beginPath();
-  ctx.moveTo(KX + 20 * S, KB - 34 * S);
-  ctx.quadraticCurveTo(KX + 38 * S, KB - 30 * S, KX + 40 * S, KB - 12 * S);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(KX + 14 * S, KB - 38 * S);
-  ctx.quadraticCurveTo(KX - 2 * S, KB - 44 * S, KX - 10 * S, KB - 38 * S);
-  ctx.stroke();
-  // the pelt — dark red showing at the flank where wind stripped the drift:
-  // the ONLY warm mass in the scene's body (accent law)
-  for (let i = 0; i < 40; i++) {
-    const px = KX - 14 * S + R() * 26 * S;
-    const py = KB - 12 * S - R() * 36 * S;
-    dab(ctx, px, py, (3 + R() * 6) * S * 0.4, (5 + R() * 9) * S * 0.4, (R() - 0.5) * 0.5,
-      R() < 0.6 ? "#4a1410" : "#5e1a12", 0.62);
-  }
-  // THE CLAPPER-GREATSWORD — planted, his hands at rest on its pommel
-  ctx.strokeStyle = "#0a0c11";
-  ctx.lineWidth = 11;
-  ctx.beginPath();
-  ctx.moveTo(KX - 30 * S, KB);
-  ctx.lineTo(KX - 34 * S, KB - 58 * S);
-  ctx.stroke();
-  dab(ctx, KX - 34.5 * S, KB - 59 * S, 4.5 * S * 0.5, 6 * S * 0.5, 0.1, "#0a0c11", 1); // the head
-  dab(ctx, KX - 35 * S, KB - 59 * S, 2, 4.5, 0.2, "#7e2418", 0.55); // ember catch
-  dab(ctx, KX - 34 * S, KB - 62 * S, 3.5 * S * 0.5, 1.2 * S * 0.5, 0.1, "#9aacc0", 0.8); // snow cap
-  // SNOW — a BLANKET following the silhouette, not scattered clumps (board-caught:
-  // discrete pale dabs read as mushrooms). Long low strokes hugging the crest line.
-  for (let i = 0; i < 30; i++) {
-    const u = 0.06 + (i / 30) * 0.88;
-    const px = KX - 20 * S + u * 46 * S;
-    const along = Math.sin(u * Math.PI);
-    const py = KB - 63 * S * along - 1.5 * S;
-    dab(ctx, px, py, (9 + R() * 7) * S * 0.5, (1.4 + R() * 1.2) * S * 0.5,
-      Math.cos(u * Math.PI) * -0.5, R() < 0.7 ? "#9aacc0" : "#b6c6d8", 0.8);
-  }
-  // drift piled where he meets the field
-  for (let i = 0; i < 10; i++) {
-    dab(ctx, KX - 24 * S + R() * 50 * S, KB - 2 - R() * 4, (8 + R() * 12) * S * 0.4,
-      (2 + R() * 2) * S * 0.4, (R() - 0.5) * 0.1, "#9aacc0", 0.7);
-  }
-  // garlands gone to seed on his wrists (they loved him — it shows), wax strata
-  dab(ctx, KX - 26 * S, KB - 10 * S, 6 * S * 0.5, 2 * S * 0.5, 0.2, "#5a5040", 0.7);
-  dab(ctx, KX - 22 * S, KB - 8 * S, 5 * S * 0.5, 2 * S * 0.5, -0.1, "#6a5a44", 0.6);
-  for (let i = 0; i < 6; i++) {
-    dab(ctx, KX - 4 * S + R() * 14 * S, KB - 50 * S - R() * 10 * S, 1.6 * S * 0.5,
-      (5 + R() * 8) * S * 0.5, 0.05, "#8a7a62", 0.5);
-  }
-  // ember rim along his west silhouette — the heart knows its own
-  ctx.strokeStyle = "#7e2418";
-  ctx.globalAlpha = 0.45;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(KX - 21 * S, KB - 46 * S);
-  ctx.quadraticCurveTo(KX - 13 * S, KB - 64 * S, KX + 5 * S, KB - 63 * S);
-  ctx.stroke();
-  ctx.globalAlpha = 1;
-
-  return { canvas: c, parallax: 0.85, yOff: 600 };
-}
-
 // snow-drift bands (the fog of this scene — pale, alive)
 function s5Drift(seed: number, near: boolean): Layer {
   const [c, ctx] = makeCanvas(near ? 840 : 760, near ? 1050 : 980);
@@ -415,7 +329,8 @@ export const SCENE5: SceneDef = {
         s5Far(),
         s5Tower(),
         s5Drift(571, false),
-        s5Colossus(),
+        // THE FIRST AWAKE lives at runtime now (src/awake.ts) — Phase 3 gave the
+        // statue its four-hundred-year heartbeat. The bake keeps only his world.
         s5Drift(573, true),
         s5Ground(),
       ],

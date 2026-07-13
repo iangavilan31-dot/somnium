@@ -116,6 +116,21 @@ export class Fx {
     this.smears.push({ tx, ty, gx, gy, age: 0 });
   }
 
+  // THE BURIED FLOOR TOLLS (§5): a dull ring blooms in the snow underfoot
+  private rings: { x: number; y: number; age: number }[] = [];
+  tollRing(x: number, y: number) { this.rings.push({ x, y, age: 0 }); }
+  // the drift of forty winters leaves his shoulders
+  snowShed(x: number, y: number) {
+    for (let i = 0; i < 9; i++) {
+      this.parts.push({
+        x: x + (this.R() - 0.5) * 60, y: y + (this.R() - 0.5) * 30,
+        vx: (this.R() - 0.5) * 30, vy: 20 + this.R() * 60,
+        age: 0, life: 0.9 + this.R() * 0.8,
+        size: 2 + this.R() * 3.5, color: this.R() < 0.6 ? "#9aacc0" : "#b6c6d8",
+      });
+    }
+  }
+
   // SOUND-EATERS: ravens answer a great noise — they bank toward it, take one
   // slow circle over the ring, and carry it away (§12: the heaviest impacts are
   // punctuated by a bird, never a bigger flash). Also spawns a flight if the
@@ -331,10 +346,26 @@ export class Fx {
       this.smears[i].age += dt;
       if (this.smears[i].age > 0.16) this.smears.splice(i, 1);
     }
+    // toll rings on the buried floor
+    for (let i = this.rings.length - 1; i >= 0; i--) {
+      this.rings[i].age += dt;
+      if (this.rings[i].age > 1.15) this.rings.splice(i, 1);
+    }
   }
 
   // called inside the world transform, BEFORE the knight (fx sit behind him)
   draw(ctx: CanvasRenderingContext2D) {
+    // the buried floor tolls — a dull ring blooms in the snow underfoot (§5)
+    for (const r of this.rings) {
+      const u = r.age / 1.15;
+      ctx.globalAlpha = 0.35 * (1 - u);
+      ctx.strokeStyle = "#b6c6d8";
+      ctx.lineWidth = 2 - u;
+      ctx.beginPath();
+      ctx.ellipse(r.x, r.y, 14 + u * 64, (14 + u * 64) * 0.22, 0, 0, TAU);
+      ctx.stroke();
+    }
+    ctx.globalAlpha = 1;
     // shooting stars
     for (const s of this.streaks) {
       const u = s.age / s.life;
