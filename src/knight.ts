@@ -81,12 +81,19 @@ interface Move {
   keys: Key[];
   impact: number; strikeEnd: number; total: number;
   cancelFrom: number;
+  heavyFrom?: number; // §19 finisher slot — charge may gather from here (default: cancelFrom)
   chain?: string;   // next light in the combo
   lunge: number;    // forward px carried through the strike (momentum honesty)
   dust: number;     // painted flecks at impact
   loud: number;     // ATTENTION-IS-NOISE value (consumed in Phase 2b)
   stop: number;     // §10 hitstop, applied ONLY when the strike lands
 }
+
+// §19 THE CHAIN CONTRACT — each cut's follow-through pose IS the next cut's first
+// key, so a chained swing GATHERS from where the blade actually ended. The sentence:
+// descending → cross → rising → the held heavy. No swing restarts from neutral.
+const L1_FOLLOW = P({ pelvisX: 10, pelvisY: 71, torso: 15, head: -1, shR: 50, elR: 15, sword: 26, shL: -14, elL: 26, hipL: 18, shinL: 0, hipR: -20, shinR: -24 });
+const L2_FOLLOW = P({ pelvisX: 8, pelvisY: 70, torso: 12, head: -2, shR: 70, elR: 12, sword: 72, shL: -12, elL: 26, hipL: 18, shinL: 0, hipR: -20, shinR: -26 });
 
 // L1 — THE DESCENDING CUT. 8f anticip · 3f strike · 12f follow. Cancel: impact+2f.
 const L1: Move = {
@@ -95,40 +102,42 @@ const L1: Move = {
     { t: 0, pose: IDLE, ease: easeInOutCubic },
     { t: 8 * F, pose: P({ pelvisX: -9, pelvisY: 68, torso: -16, head: 6, shR: -138, elR: 62, sword: -12, shL: 30, elL: 26, hipL: 15, shinL: -4, hipR: -19, shinR: -24 }), ease: easeInOutCubic },
     { t: 11 * F, pose: P({ pelvisX: 14, pelvisY: 70, torso: 21, head: -2, shR: 66, elR: 6, sword: 14, shL: -20, elL: 32, hipL: 24, shinL: 2, hipR: -26, shinR: -30 }), ease: easeInCubic },
-    { t: 17 * F, pose: P({ pelvisX: 10, pelvisY: 71, torso: 15, head: -1, shR: 50, elR: 15, sword: 26, shL: -14, elL: 26, hipL: 18, shinL: 0, hipR: -20, shinR: -24 }), ease: easeOutCubic },
+    { t: 17 * F, pose: L1_FOLLOW, ease: easeOutCubic },
     { t: 23 * F, pose: IDLE, ease: easeInOutCubic },
   ],
   impact: 8 * F, strikeEnd: 11 * F, total: 23 * F, cancelFrom: 13 * F,
   chain: "L2", lunge: 10, dust: 6, loud: 3, stop: 2 * F,
 };
 
-// L2 — THE CROSS. 6f anticip · 3f strike · 12f follow. Coil across the body,
-// untwist through a level sweep. Chain L3 or roll.
+// L2 — THE CROSS. 6f anticip · 3f strike · 12f follow. Enters ON L1's follow-through
+// (§19), coils across the body inside its 6 anticipation frames, untwists level.
 const L2: Move = {
   name: "L2",
   keys: [
-    { t: 0, pose: P({ pelvisX: -6, pelvisY: 69, torso: -12, head: 4, shR: -50, elR: 80, sword: -120, shL: 26, elL: 20, hipL: 14, shinL: -2, hipR: -18, shinR: -26 }), ease: easeInOutCubic },
+    { t: 0, pose: L1_FOLLOW, ease: easeInOutCubic },
     { t: 6 * F, pose: P({ pelvisX: -8, pelvisY: 69, torso: -15, head: 5, shR: -58, elR: 84, sword: -124, shL: 28, elL: 22, hipL: 14, shinL: -2, hipR: -18, shinR: -26 }), ease: easeInCubic },
     { t: 9 * F, pose: P({ pelvisX: 12, pelvisY: 70, torso: 18, head: -3, shR: 55, elR: 8, sword: 55, shL: -18, elL: 30, hipL: 22, shinL: 0, hipR: -24, shinR: -28 }), ease: easeInCubic },
-    { t: 15 * F, pose: P({ pelvisX: 8, pelvisY: 70, torso: 12, head: -2, shR: 70, elR: 12, sword: 72, shL: -12, elL: 26, hipL: 18, shinL: 0, hipR: -20, shinR: -26 }), ease: easeOutCubic },
+    { t: 15 * F, pose: L2_FOLLOW, ease: easeOutCubic },
     { t: 21 * F, pose: IDLE, ease: easeInOutCubic },
   ],
   impact: 6 * F, strikeEnd: 9 * F, total: 21 * F, cancelFrom: 11 * F,
   chain: "L3", lunge: 12, dust: 6, loud: 3, stop: 2 * F,
 };
 
-// L3 — THE RISING CUT (capstone). 12f anticip · 4f strike · 18f follow. Commit —
-// no cancel. Deep crouch load, explosive rise, HELD pose at the top (cover frame).
+// L3 — THE RISING CUT (capstone). 12f anticip · 4f strike · 18f follow. Enters ON
+// L2's follow-through (§19): the swept blade falls THROUGH the crouch load, then the
+// explosive rise, HELD pose at the top (cover frame). Commit — only the finisher
+// slot (heavyFrom, after the hold) may gather out of it; never a roll-escape.
 const L3: Move = {
   name: "L3",
   keys: [
-    { t: 0, pose: P({ pelvisX: -4, pelvisY: 62, torso: 18, head: 2, shR: -10, elR: 12, sword: -50, shL: 24, elL: 30, hipL: 30, shinL: -16, hipR: -22, shinR: -52 }), ease: easeInOutCubic },
+    { t: 0, pose: L2_FOLLOW, ease: easeInOutCubic },
     { t: 12 * F, pose: P({ pelvisX: -10, pelvisY: 52, torso: 30, head: 6, shR: -24, elR: 14, sword: -40, shL: 34, elL: 40, hipL: 40, shinL: -20, hipR: -20, shinR: -70 }), ease: easeInCubic },
     { t: 16 * F, pose: P({ pelvisX: 12, pelvisY: 82, torso: -18, head: -8, shR: 85, elR: 6, sword: 62, shL: -26, elL: 24, hipL: 10, shinL: 6, hipR: -22, shinR: -18 }), ease: easeInCubic },
     { t: 25 * F, pose: P({ pelvisX: 10, pelvisY: 78, torso: -14, head: -6, shR: 82, elR: 8, sword: 58, shL: -22, elL: 24, hipL: 10, shinL: 4, hipR: -20, shinR: -18 }), ease: easeOutCubic },
     { t: 34 * F, pose: IDLE, ease: easeInOutCubic },
   ],
-  impact: 12 * F, strikeEnd: 16 * F, total: 34 * F, cancelFrom: Infinity,
+  impact: 12 * F, strikeEnd: 16 * F, total: 34 * F, cancelFrom: Infinity, heavyFrom: 25 * F,
   lunge: 14, dust: 9, loud: 3.4, stop: 3 * F,
 };
 
@@ -379,6 +388,7 @@ export class Knight {
   private actFired = false;
   private act: Move | null = null;
   private chainBuf = 0;          // buffered attack tap (s remaining)
+  private heavyBuf = 0;          // buffered heavy tap — the §19 finisher slot
   private rollBuf = 0;           // buffered roll tap
   private rollAxisBuf = 0;       // direction held AT the tap (intent fidelity)
   private rollAxisZBuf = 0;      // depth held at the tap — the circling verb (§18)
@@ -533,7 +543,7 @@ export class Knight {
     this.vx = -this.facing * 240;
     // §19 buffer honesty: a landed hit CLEARS every buffered intent —
     // no roll from beyond the grave (the Elden Ring lesson, research canon)
-    this.chainBuf = 0; this.rollBuf = 0; this.rollAxisBuf = 0; this.rollAxisZBuf = 0;
+    this.chainBuf = 0; this.heavyBuf = 0; this.rollBuf = 0; this.rollAxisBuf = 0; this.rollAxisZBuf = 0;
     for (const n of this.cloak) { n.px -= this.facing * 7; } // whip
     fx.dust(this.x, this.groundY() - 2, 6, -this.facing);
     if (this.wounds >= 3) {
@@ -551,8 +561,10 @@ export class Knight {
     this.parryRipT = Math.max(0, this.parryRipT - dt);
     this.guardJolt = Math.max(0, this.guardJolt - dt);
     this.chainBuf = Math.max(0, this.chainBuf - dt);
+    this.heavyBuf = Math.max(0, this.heavyBuf - dt);
     this.rollBuf = Math.max(0, this.rollBuf - dt);
     if (ii.attackTap) this.chainBuf = 0.18;
+    if (ii.heavyTap) this.heavyBuf = 0.18;
     if (ii.roll) { this.rollBuf = 0.15; this.rollAxisBuf = ii.axis; this.rollAxisZBuf = ii.axisZ; }
 
     // ---- verb starts from mobile/guard states ----
@@ -560,7 +572,7 @@ export class Knight {
       if (this.rollBuf > 0) {
         this.startRollOrBackstep(ii.axis, ii.axisZ, fx);
       } else if (ii.heavyTap && this.state !== "guard") {
-        this.state = "charge"; this.stateT = 0;
+        this.state = "charge"; this.stateT = 0; this.heavyBuf = 0;
         // facing locks toward the stick if it speaks, else stays
         if (Math.abs(ii.axis) > 0.2) this.facing = ii.axis > 0 ? 1 : -1;
       } else if (this.chainBuf > 0) {
@@ -662,6 +674,14 @@ export class Knight {
         if (this.stateT >= m.cancelFrom) {
           if (this.rollBuf > 0) this.startRollOrBackstep(ii.axis, ii.axisZ, fx);
           else if (this.chainBuf > 0 && m.chain) this.startAct(MOVES[m.chain]);
+        }
+        // §19 the finisher slot: a buffered heavy GATHERS into the charge from the
+        // follow-through (L1/L2) or after L3's held cover frame — the sentence's
+        // fourth cut. Tap = quick finisher, hold = the full charge. Never an escape.
+        if (this.state === "act" && this.heavyBuf > 0 && (m.chain || m.heavyFrom != null)
+          && this.stateT >= (m.heavyFrom ?? m.cancelFrom)) {
+          this.heavyBuf = 0;
+          this.state = "charge"; this.stateT = 0; this.act = null;
         }
         if (this.state === "act" && this.stateT >= m.total) {
           this.state = "idle"; this.stateT = 0; this.act = null;
