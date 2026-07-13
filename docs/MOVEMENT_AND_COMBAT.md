@@ -1,7 +1,11 @@
 # SOMNIUM — MOVEMENT & COMBAT BIBLE
-**The feel canon. · v1.1 · 2026-07-12 · sits under WORLD_BIBLE.md, peer to ART_DIRECTION.md**
+**The feel canon. · v2.0 · 2026-07-12 · sits under WORLD_BIBLE.md, peer to ART_DIRECTION.md**
 *(v1.1 amendment: Ian's LAW OF STILLNESS chapter — the named root law, the Painter's
 Camera, the ringing blade, attention-is-noise co-op, parry refinements, the Boss Law.)*
+*(v2.0 amendment, same day: Ian's master prompt v2 goal-locked — THE DEPTH BAND §18,
+chain-flow contract §19, the context camera §20, the Stirred roster §21, the sandbox §22.
+Research canon: `ObsidianPKM\research\somnium-combat-canon-2026-07-12.md`. One §17 kill
+reversed by direct order; every other kill stands.)*
 
 > **Hierarchy:** `BRIEF.md` (scope — supreme) → `WORLD_BIBLE.md` (meaning) →
 > { `docs/ART_DIRECTION.md` (how a frame looks) · **this doc** (how the knights feel) }.
@@ -381,7 +385,9 @@ mastery through animation alone? · would it hold up beside modern AAA action ga
 
 - **Swimming** → killed; deep water = deep dream (boundary event with meaning §3.6).
 - **Ziplines** → killed; the Hush does not do fast. (The template itself hedged.)
-- **Sidestep-as-verb** → killed; the y-band is narrow by design — backstep owns spacing.
+- **Sidestep-as-verb** → *kill REVERSED in spirit 2026-07-12 by Ian's master prompt v2
+  (goal-locked): the band is now real (§18) and depth-walk + depth-roll own lateral
+  spacing. No separate "sidestep" move exists — the band itself is the sidestep.*
 - **The 14-weapon arsenal** (longsword→whip→tome→catalyst) → killed; two knights, one
   dreamed sword each, mastered — by the template's own maxim. Clapper = NG+ seed only.
 - **Shield formations / shield bash / dual shields** → killed; the slides' knights carry
@@ -396,6 +402,116 @@ mastery through animation alone? · would it hold up beside modern AAA action ga
   (breath = fatigue; facing = lock-on; the world = the UI).
 - **Perfect Counter + Guard Counter + Parry + Riposte as four systems** → collapsed to
   one skill expression: the Hush-parry and its riposte, plus plain guard.
+
+---
+
+# v2.0 — THE DEPTH AMENDMENT (Ian's master prompt v2, goal-locked 2026-07-12)
+
+*Principles extracted and re-derived for this world, as v1.1 did with its source. Every
+number marked TUNE is a starting slider from the research canon, honest until the pad
+says otherwise.*
+
+## §18 · THE DEPTH BAND (the world model — the one structural change)
+
+**Fiction (World Gate):** the knights were always free to step off the pilgrim line into
+the meadow's depth — the world simply never needed them to. Now that the Stirred circle,
+it does. The band is the painting's foreground; walking "toward the frame" walks toward
+the reader of the paperback.
+
+- **World model:** every actor = `(x, z, h)` — x along the journey, z depth inside the
+  band (+z toward camera), h height above ground (jump/plunge only). Screen: `sy =
+  GROUND_Y + z·Z_SLOPE − h`, scale `1 + z·Z_SCALE` (subtle — TUNE ≈ ±5% across the band),
+  draw order = z-sort of the whole world pass (knights, Stirred, fire, boss slot, fx).
+- **The band is authored per scene** (designed play spaces, never systemic): `SceneDef`
+  gains `bandNear/bandFar` (+ optional per-x-range overrides for paths, ledges, arena
+  mouths). S1 field = generous; stair stretches = narrow ribbon (the band is composition).
+- **Depth speed** ≈ 0.6× walk speed (belt-scroller cadence, TUNE); diagonals normalized.
+  Facing stays ±1 — the knights are side-view creatures; z-movement never flips them.
+- **Generous to hit, honest to dodge (the pick, logged):** attack events carry a WIDE
+  z-tolerance (TUNE start: knight ~±26px, Stirred lights similar); the knight's hurt
+  z-band NARROWS while actively depth-moving (the SoR4 rule). No position magnetism —
+  the generosity IS the band. False-positive law: a rolling/downed body's z-band is its
+  posture's, not its standing one.
+- **The shadow is the depth UI:** every actor's contact shadow is pinned to `(x, z, h=0)`
+  and never leaves the ground; it is the only depth instrument. No markers, no arrows,
+  no outlines (banned list). Jump = ground(x,z) + h arc; z steerable mid-air but damped
+  0.4× (TUNE); the shadow shows the landing before the knight does.
+- **Circling:** roll aims along the held stick vector (x/z normalized), same fixed 140px,
+  same i-frames — the circle verb is the roll the knights already know. Backstep stays
+  pure −facing (the spacing verb is 1D on purpose: retreat is along the blade line).
+- **Camera:** x-framing unchanged; the camera does NOT chase z (the band lives inside the
+  frame's height). Depth never scrolls; it composes.
+- **Co-op:** knights repel gently within ~24px ellipse (never superimpose — our choice,
+  extending the SoR4 player rule); embrace/quieting/fire checks become elliptical
+  distances (x-weighted 1 : z-weighted 2.2, TUNE).
+
+## §19 · CHAIN FLOW (the end-pose contract — the feel rework)
+
+**The demand: no swing restarts from neutral.** The chain is one sentence, not three words.
+
+- **Contract:** L2's first key = L1's follow-through pose; L3's first key = L2's. The
+  chain window opens at impact+2f (existing cancel law) and closes at recovery end; a
+  chained cut SKIPS its neutral wind-up — its anticipation is the previous follow-through
+  gathered (TUNE: chained anticipation ≈ 60% of cold anticipation, staying inside §10's
+  totals).
+- **The finisher slot:** heavyTap during L2/L3 recovery starts the charge FROM that end
+  pose (light-heavy already exists; now it inherits the pose). The full sentence:
+  descending → cross → rising → the held heavy. Four cuts, one breath.
+- **Selection considers the body** (master prompt): the mover picks the next cut by
+  current sword side (L1 ends blade-low-right → L2 pulls cross from there), sprint state
+  (RUNATK), roll state (rolling attack), airborne (jump/falling attack §18), backstep
+  (poke). No same-swing-twice, ever (§10 law upheld).
+- **Buffer honesty (research, ER lesson):** all input buffers CLEAR when a hit lands on
+  the knight — no roll from beyond the grave. Buffers stay open through hitstop (the
+  SF2 gift). First visible response to any press ≤3f even when contact is 20f away.
+- **Steps carry:** each chained cut steps the knight forward per §10's momentum line;
+  the struck Stirred gives the same ground — the duel travels across the band.
+
+## §20 · THE CONTEXT CAMERA (three rooms, one painter)
+
+The Painter's Camera (§1.5) gains combat awareness. Three states, eased blends
+(~1.5s ease-in-out, TUNE; never a cut):
+
+- **EXPLORATION** — as built: wide, anchors, repose, sprint-widen. Unchanged.
+- **COMBAT** — any Stirred drawn/attacking in frame: zoom eases ~7% closer (readability,
+  not drama), target biases toward the fight's centroid while ALWAYS fitting both
+  knights (fit-both never loses), slight look-ahead toward the loudest threat. Painterly
+  restraint: no shake beyond the existing trauma cap; trauma = trauma² with Perlin
+  channels (research-verified Eiserloh) already matches §12.
+- **BOSS** — the §5 law verbatim: locked wide 0.74, both knights + his full height,
+  push-ins rationed two per boss. Phase transitions may reframe once, eased.
+- **Mental-map law (GoW rules, scaled):** an on-screen Stirred only leaves frame if the
+  players caused it; an off-screen one never attacks without its cry arriving first
+  (§21 the Criers; ravens bank = the direction hint). The camera never surprises.
+
+## §21 · THE STIRRED ROSTER (each teaches one lesson; all pass WB §0 → CANON_LOG)
+
+*All are Stirred — the dream's memory of Loud Age soldiers, ink over denting plate. No
+skeletons, no goblins, no recolors: variants differ in silhouette, plate, and what they
+remember.*
+
+| Variant | Silhouette (64px) | Lesson | Language |
+|---|---|---|---|
+| **The Stirred** (built) | broken mirror of the knight | timing & spacing | existing dent/glance |
+| **The Sealed** | plate fused into a tower shield-wall, no gaps forward | flanking — the band exists | front undentable (glance forever); kick staggers; a cut from ≠z or behind opens it. Never strikes first — it only holds ground |
+| **The Startled** | thin, low, too many elbows; bolts in ink-streaks | reaction & the depth-roll | crosses z constantly; lunge telegraphs long (24f) but arrives fast; whiffs leave it sprawled |
+| **The Burdened** | colossal hunch under a BOUND BELL strapped to its back | patience & stagger | absorbs lights; heavies stagger; its bell must never touch ground — the joint quieting (both knights) is its only rest. Slow arcs, honest recoveries |
+| **The Crier** | head thrown back, jaw unhinged mid-wail | pressure & priority | no projectiles — its CRY is the ranged attack: a visible ripple ring that staggers and WAKES nearby Stirred (attention-is-noise weaponized). Killing quiet = killing it first |
+| **The Remembered** | upright, keeper's staff-drill stance — it stands like the statues | the parry | fights in keeper footwork (the minotaur Phase-3 language, seeded early); its measured strikes are THE parry teacher; a parried Remembered kneels a beat — grief, not stun |
+
+- Alignment AI: a Stirred seeks z-alignment before striking (|dz| < tolerance), repels
+  its kin (no stacking), and attention-is-noise remains the only aggro law — the token
+  pool is the loudness ranking, cap ~2 simultaneous attackers (TUNE), asynchronous.
+- Placement stays sparse and authored (§8). No filler, no waves, no inflated ink.
+
+## §22 · THE SANDBOX (the yard — where feel is proven)
+
+A dev harness, not a chapter: `?yard` boots a single S1-slice arena — full band, one
+rest-fire, and **the Bound Post**: a Loud Age training post wrapped in keeper's felt
+(a thing built to be struck without waking anything — the one lawful loudness in the
+world). It takes every strike, rings muffled, shows dents that knit; toggleable sparring
+Stirred of each §21 variant spawn by key. Every moveset change is proven here against
+the Feel Gate BEFORE it enters the journey. Player-facing version = POST-V1 paper.
 
 ---
 

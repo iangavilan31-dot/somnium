@@ -44,6 +44,27 @@ animation-first (GEEKED/RIFT WARDEN died ignoring it) · banned list absolute._
   large Stirred · dual-parry + toll-sync live tests (need 2 pads → Ian) · S4 shade-vs-black-stone
   palette check (4b) · stagger posture-knit tuning after pad feel.
 
+## Phase 2.75 — THE DEPTH AMENDMENT (master prompt v2, GYAT run 2026-07-12 — M&C §18–§22)
+_Order chosen so every step is provable in the yard before it touches the journey._
+- [ ] 2.75a. Depth plumbing: (x,z,h) world model, z-sorted world pass, contact shadows,
+      per-scene bands (SceneDef.bandNear/bandFar), depth input axis (W/S + stick-Y; rest
+      gesture moves KeyS→KeyE hold, pad unchanged), diagonal-normalized locomotion,
+      elliptical proximity checks (fire/embrace/quieting), knight repel, bounds clamp
+- [ ] 2.75b. THE YARD (?yard): S1-slice arena + the Bound Post + variant spawn keys —
+      the proving ground (build immediately after plumbing so everything lands in it)
+- [ ] 2.75c. Chain flow §19: end-pose contract L1→L2→L3→heavy-finisher slot, chained
+      anticipation ≈60%, buffer-clear-on-hit, buffers-open-through-hitstop, ≤3f first response
+- [ ] 2.75d. Depth combat: z-tolerance on strike events (generous), hurt-band narrowing
+      while depth-moving, depth-aim roll (circling), Stirred z-alignment AI + kin repulsion
+- [ ] 2.75e. Context camera §20: COMBAT state (+7% ease-in, centroid bias, fit-both wins),
+      mental-map law, 1.5s blends; BOSS state already law
+- [ ] 2.75f. Traversal verbs (yard-proven, then placed): jump(gap) w/ shadow-telegraphed
+      landing + jump/falling attacks; slide (downhill + under + slide-attack); vault; mantle
+- [ ] 2.75g. Roster §21 (each = approaches→critique→synthesize per Review Board):
+      the Sealed → the Startled → the Crier → the Burdened → the Remembered
+- [ ] 2.75h. Journey integration: bands + sparse variant placement per scene (S1 teacher
+      pair, S2 Sealed intro, S3 Crier vista ambush, S4 Burdened + Remembered), regression walk
+
 ## Phase 3 — THE FIRST AWAKE
 - [x] 3a. THE REVEAL ✅ BOARD-PASSED 2026-07-12 (proof docs/awake/, esp. 08-the-ward = the poster)
   Built: src/awake.ts — statue mode = EXACT live replica of the board-passed bake (seed 541, drawn

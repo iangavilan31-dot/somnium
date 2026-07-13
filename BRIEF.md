@@ -187,3 +187,17 @@ narrative text — 2–5 serif words as chapter whispers.
 3. **Phase 3 — The Minotaur:** the set-piece, phases, spectacle.
 4. **Phase 4 — Polish:** audio, grading pass per scene, perf, critics → `docs/GRADES.md`,
    ≥85 or iterate. Then Ian's pad playtest is the real verdict.
+
+---
+
+## 8. Amendment — master prompt v2 (goal-locked by Ian, 2026-07-12)
+
+Combat overhaul inserted between Phase 3a (reveal, done) and 3b (the fight): the game
+becomes **2.75D** — depth movement inside designed play spaces (§7.4's "narrow y band"
+is now a real authored band); the flagged jump verb plus vault/mantle/slide enter scope;
+the light chain flows from end poses; the camera gains a combat context; the Stirred
+gain a teaching roster; one boss (THE FIRST AWAKE) is perfected before any world
+expansion. **Sandbox bar:** the yard must be replayable with no story reward. Full
+contract: `docs/MOVEMENT_AND_COMBAT.md` §18–§22 (v2.0) + `GYAT.md` (goal-lock + must-beat
+bar) + research canon in the vault. Non-goals unchanged; the GOAL still wins every
+conflict.
