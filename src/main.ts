@@ -4,7 +4,7 @@
 
 import { clamp, damp, easeInOutCubic, lerp, noise1 } from "./math";
 import { bakeEmberVeil, bakeGrainTiles, bakeGlowSprite, bakeVignette, GROUND_Y, PLATE_RES, WORLD_W } from "./paint";
-import { Knight } from "./knight";
+import { Knight, NO_INTENT, type Intents } from "./knight";
 import { Fx } from "./fx";
 import { InputHub, type PlayerInput } from "./input";
 import { drawDebug, type Perf } from "./debug";
@@ -83,6 +83,8 @@ let titleSkipped = skipTitle;
 let whisperT = -1;
 let debugOn = false;
 let lastInputT = 0; // the repose: stillness invites the wide painting (M&C §1.5)
+let lastDualT = -1e9; // last dual-parry (so one catch can't retrigger the full breath)
+let timeScale = 1;    // QA-only slow motion (animation arc review); never shipped UI
 
 // scene transition (the world re-dreams forward)
 let trans: "none" | "out" | "in" = skipTitle ? "none" : "none";
@@ -114,11 +116,21 @@ declare global {
       replay: () => void; state: () => string; attack: () => void; hit: () => void;
       walk: (ax: number) => void; scene: () => number; join2: () => void;
       rest: (held: boolean) => void; skipToScene: (id: number) => void; x: () => number;
+      // Phase 2a QA hooks (real keys are still the law for proof captures)
+      tap: (n: "attack" | "heavy" | "roll" | "parry") => void;
+      sprint: (b: boolean) => void; guard: (b: boolean) => void;
+      heavyHold: (b: boolean) => void; quiet: () => void;
+      collapse: () => void; collapse2: () => void; wounds: () => number;
+      slow: (f: number) => void; sx: (p2?: boolean) => number;
     };
   }
 }
 let forcedAxis = 0;
 let forcedRest = false;
+let forcedSprint = false;
+let forcedGuard = false;
+let forcedHeavyHold = false;
+let forcedTap: Partial<Intents> = {};
 window.__somnium = {
   replay,
   state: () => p1.state,
@@ -133,6 +145,26 @@ window.__somnium = {
     if (i >= 0) { enterScene(i, true); trans = "in"; transT = 0; }
   },
   x: () => p1.x,
+  tap: (n) => {
+    if (n === "attack") forcedTap.attackTap = true;
+    else if (n === "heavy") forcedTap.heavyTap = true;
+    else if (n === "roll") forcedTap.roll = true;
+    else forcedTap.parryTap = true;
+  },
+  sprint: (b) => { forcedSprint = b; },
+  guard: (b) => { forcedGuard = b; },
+  heavyHold: (b) => { if (b && !forcedHeavyHold) forcedTap.heavyTap = true; forcedHeavyHold = b; },
+  quiet: () => p1.startQuieting(),
+  collapse: () => { p1.wounds = 2; p1.tryHit(fx); },
+  collapse2: () => { const k = knights[1]; if (k) { k.wounds = 2; k.tryHit(fx); } },
+  wounds: () => p1.wounds,
+  slow: (f: number) => { timeScale = clamp(f, 0.05, 1); },
+  sx: (p2 = false) => { // knight's CSS-px screen x (QA capture framing)
+    const k = p2 ? knights[1] : p1;
+    if (!k) return -1;
+    const vs = Math.max(cw / 1920, ch / 1080);
+    return (cw / 2 + (k.x - cam.x) * vs * cam.zoom) / dpr;
+  },
 };
 
 const perf: Perf = { fps: 60, simMs: 0, renderMs: 0 };
@@ -142,15 +174,29 @@ window.__perf = perf;
 const DT = 1 / 120;
 let acc = 0, last = performance.now();
 
-function knightInput(k: Knight, inp: PlayerInput, dt: number, forced: boolean) {
+function knightInput(k: Knight, partner: Knight | null, inp: PlayerInput, dt: number, forced: boolean) {
   const axis = forced && forcedAxis !== 0 ? forcedAxis : inp.axis();
-  if (inp.attackPressed()) k.tryAttack();
   if (inp.hitPressed()) k.tryHit(fx);
-  // the rest ritual — only near the fire, only when the scene has one
   const nearFire = fire != null && Math.abs(k.x - fire.x) < 90;
-  const restWanted = (forced && forcedRest) || inp.restHeld();
-  k.setRest(restWanted && nearFire, fire ? fire.x : k.x);
-  k.update(dt, k.sitting ? 0 : axis, t, fx);
+  const stationary = Math.abs(axis) < 0.2;
+  const held = (forced && forcedRest) || inp.restHeld();
+  // ONE held gesture, two meanings: tend a fallen partner first, else rest at the fire
+  const partnerDown = !!partner && partner.downed && Math.abs(k.x - partner.x) < 56;
+  k.setEmbrace(partnerDown && held && stationary, partner ? partner.x : k.x);
+  k.setRest(held && nearFire && stationary && !partnerDown, fire ? fire.x : k.x);
+  const ii: Intents = {
+    axis: k.sitting || k.state === "embrace" ? 0 : axis,
+    sprint: inp.sprintHeld() || (forced && forcedSprint),
+    attackTap: inp.attackPressed() || !!(forced && forcedTap.attackTap),
+    heavyTap: inp.heavyPressed() || !!(forced && forcedTap.heavyTap),
+    heavyHeld: inp.heavyHeld() || (forced && forcedHeavyHold),
+    // the settling gesture wins over the backstep at the fire
+    roll: (inp.rollPressed() || !!(forced && forcedTap.roll)) && !(nearFire && stationary && held),
+    guardHeld: inp.guardHeld() || (forced && forcedGuard),
+    parryTap: inp.parryPressed() || !!(forced && forcedTap.parryTap),
+  };
+  if (forced) forcedTap = {};
+  k.update(dt, ii, t, fx);
   if (k.attackSmearActive()) {
     const [tx, ty] = k.swordTipWorld();
     const [gx, gy] = k.swordGuardWorld();
@@ -177,12 +223,27 @@ function sim(dt: number) {
   if (hub.p2JoinRequested) joinP2();
 
   const playable = p1.wakeDone && trans === "none";
-  if (playable) knightInput(p1, hub.p1, dt, true);
-  else p1.update(dt, 0, t, fx);
   const k2 = knights[1];
+  if (playable) knightInput(p1, k2, hub.p1, dt, true);
+  else p1.update(dt, NO_INTENT, t, fx);
   if (k2) {
-    if (trans === "none") knightInput(k2, hub.p2, dt, false);
-    else k2.update(dt, 0, t, fx);
+    if (trans === "none") knightInput(k2, p1, hub.p2, dt, false);
+    else k2.update(dt, NO_INTENT, t, fx);
+  }
+
+  // the embrace fills the fallen knight's rise; letting go interrupts it
+  for (const [a, b] of [[p1, k2], [k2, p1]] as const) {
+    if (!a || !b) continue;
+    if (a.state === "embrace") {
+      if (b.downed && Math.abs(a.x - b.x) < 64 && a.stateT > 0.35) b.reviveT += dt;
+      // stay kneeling THROUGH the partner's rise — you don't let go early
+      else if (!b.downed && b.state !== "rise") a.setEmbrace(false, b.x);
+    }
+  }
+  // DUAL PARRY (§11): both knights catch the same beat → the FULL held breath
+  if (k2 && Math.abs(p1.lastParryT - k2.lastParryT) < 0.25 && Math.min(p1.lastParryT, k2.lastParryT) > lastDualT) {
+    lastDualT = t;
+    fx.stall(1.0);
   }
 
   if (hub.p1.replayPressed()) replay();
@@ -239,9 +300,11 @@ function sim(dt: number) {
     // the repose (light v1): both knights still ~4s → the camera exhales into the
     // wide painting; any input takes it back instantly. Every pause is concept art.
     const reposing = t - lastInputT > 4 && p1.state === "idle" && (!k2 || k2.state === "idle" || k2.state === "sit");
+    // §4: sprint widens the frame ~4% — the world rushes, the knight shrinks in it
+    const anySprint = p1.sprinting || (k2 ? k2.sprinting : false);
     const fitZoom = spread > 10 ? (cw * 0.55) / (vs * Math.max(spread, 1)) : ZOOM_MID;
     const targetZoom = (clamp(Math.min(ZOOM_MID, fitZoom), 0.74, ZOOM_MID) + Math.sin(t * 0.5) * 0.006)
-      * (reposing ? 0.92 : 1);
+      * (reposing ? 0.92 : 1) * (anySprint ? 0.96 : 1);
     cam.zoom = damp(cam.zoom, targetZoom, reposing ? 0.8 : 2.2, dt);
     const lead = present.length > 1 ? 0 : p1.facing * 46;
     cam.x = damp(cam.x, (minX + maxX) / 2 + lead, 3.2, dt);
@@ -427,7 +490,7 @@ function frame(now: number) {
   perf.fps = fpsEma;
 
   const s0 = performance.now();
-  acc += rawDt;
+  acc += rawDt * timeScale;
   while (acc >= DT) { sim(DT); acc -= DT; }
   const s1 = performance.now();
   render();

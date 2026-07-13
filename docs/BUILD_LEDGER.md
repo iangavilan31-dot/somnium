@@ -18,7 +18,16 @@ animation-first (GEEKED/RIFT WARDEN died ignoring it) · banned list absolute._
 - S2 flame licks refine · S3 vista window readability at spawn · S4 crest softness, keeper prominence, buttress texture · S5 colossus stays ambiguous until Phase 3 · moving procession lanterns (S2) · full Painter's-Camera anchor fields · per-scene fg tuft pairs for S4/S5
 
 ## Phase 2 — Encounters
-- [ ] 2a. Full moveset per M&C §10 contracts (sprint, roll i-frames, 3-cut light combo, heavy, guard, Hush-parry held-breath, quieting, embrace-revive, collapse/crawl)
+- [x] 2a. Full moveset ✅ 2026-07-12 (proof: docs/moveset/). §10 table = literal contract data in knight.ts.
+  Sprint (12f ramp/6f skid, camera widen 4%) · roll (fixed 140px, i-frames 4–18f, tuck fixed after board fail) ·
+  backstep · L1 descending / L2 cross / L3 rising (coil re-authored; held cover frame) · charge heavy (head-up fix) ·
+  running/rolling attacks + backstep poke (probe-proven) · guard + chip jolt · Hush-parry (1f+8f window, fx.stall
+  held breath — petals freeze, wounds 0 proof — riposte window, melt-to-guard, dual-parry wired) · quieting
+  (true kneel re-authored) · collapse→crawl→rise · embrace-revive (46px shoulder offset, held through rise) ·
+  wounds 0–3 read as breath/stance (never a bar), fire mends · noise values stored per verb for 2b aggro.
+  Inputs: J/A light (fires on PRESS), I/RT charge heavy, K/B roll+sprint-hold, L/LB guard, O·;/RB parry.
+  **Carried to 2b:** hitstop application when strikes land · dual-parry live test · kick (shove) · loudness aggro
+  consumes knight.noise · solo-rally 6s is provisional death rule. Traversal verbs (jump/slide/mantle) = later, per BRIEF flag.
 - [ ] 2b. The Stirred (shade-knights/crows/stair-bats — painted smears, denting armor, hush-deaths + 2s held breath), ATTENTION-IS-NOISE aggro, the Ring, de-escalation, placed encounters per scene
 
 ## Phase 3 — THE FIRST AWAKE

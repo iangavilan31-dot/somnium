@@ -116,7 +116,14 @@ export class Fx {
     this.smears.push({ tx, ty, gx, gy, age: 0 });
   }
 
+  // THE HELD BREATH (M&C §11): a successful hush-parry stops every ambient
+  // particle — petals hang, motes freeze, embers pause mid-rise. One flag; free.
+  private stallT = 0;
+  stall(s: number) { this.stallT = Math.max(this.stallT, s); }
+  get stalled() { return this.stallT > 0; }
+
   update(dt: number) {
+    if (this.stallT > 0) { this.stallT -= dt; return; } // the world holds its breath
     // dust
     for (let i = this.parts.length - 1; i >= 0; i--) {
       const p = this.parts[i];

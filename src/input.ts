@@ -41,8 +41,17 @@ export class PlayerInput {
     const p = this.pad();
     return !!p?.buttons[b]?.pressed;
   }
-  attackPressed() { return this.key("KeyJ") || this.key("KeyX") || this.padEdge(0); } // cross/A
-  hitPressed() { return this.key("KeyH") || this.padEdge(2); } // debug harm
+  // ---- the moveset inputs (M&C §10). Lights fire on PRESS — feel honesty. ----
+  attackPressed() { return this.key("KeyJ") || this.key("KeyX") || this.padEdge(0); } // cross/A tap = light
+  heavyPressed() { return this.key("KeyI") || this.padEdge(7); }  // RT press starts the charge
+  heavyHeld() { return this.keyHeld("KeyI") || this.padHeld(7); } // release fires the heavy
+  rollPressed() { return this.key("KeyK") || this.padEdge(1); }   // B tap: roll (dir) / backstep (neutral)
+  sprintHeld() {                                                  // hold-to-sprint (Souls muscle memory)
+    return this.keyHeld("ShiftLeft") || this.keyHeld("ShiftRight") || this.keyHeld("KeyK") || this.padHeld(1);
+  }
+  guardHeld() { return this.keyHeld("KeyL") || this.padHeld(4); } // LB hold = guard
+  parryPressed() { return this.key("KeyO") || this.key("Semicolon") || this.padEdge(5); } // RB tap = Hush-parry
+  hitPressed() { return this.key("KeyH"); } // debug harm (keyboard only)
   restHeld() { return this.keyHeld("KeyS") || this.keyHeld("ArrowDown") || this.padHeld(1); } // circle/B held = rest at fire
   replayPressed() { return this.key("KeyR") || this.padEdge(9); }
 }

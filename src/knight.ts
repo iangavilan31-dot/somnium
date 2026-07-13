@@ -1,5 +1,7 @@
 // The knight — skeletal 2D rig + animation. This IS the Gate 0 product.
 // Principles enforced here: anticipation, follow-through, weight, silhouette.
+// Phase 2a: the full M&C §10 moveset. Frame budgets are CONTRACTS (F = 1/60s);
+// every move declares impact + cancel window in the MOVES table, never fudged.
 
 import { clamp, damp, easeInCubic, easeInOutCubic, easeOutCubic, lerp, noise1, rad, TAU, type Ease } from "./math";
 import { GROUND_Y } from "./paint";
@@ -8,6 +10,7 @@ import type { Fx } from "./fx";
 // ---- proportions (world px) ----
 const THIGH = 40, SHIN = 40, TORSO = 48, UARM = 30, FARM = 28, BLADE = 92;
 const STAND_PELVIS = 74;
+const F = 1 / 60; // one animation frame at the §10 baseline
 
 // Pose: every field numeric so blending is generic.
 // Angles in RADIANS at runtime; authored below in degrees.
@@ -62,20 +65,227 @@ const WAKE: Key[] = [
   { t: 4.25, pose: IDLE, ease: easeOutCubic },
 ];
 
-const ATTACK: Key[] = [
-  { t: 0.0, pose: IDLE, ease: easeInOutCubic },
-  { t: 0.30, pose: P({ pelvisX: -9, pelvisY: 68, torso: -16, head: 6, shR: -138, elR: 62, sword: -12, shL: 30, elL: 26, hipL: 15, shinL: -4, hipR: -19, shinR: -24 }), ease: easeInOutCubic },
-  { t: 0.34, pose: P({ pelvisX: -8, pelvisY: 68, torso: -14, head: 5, shR: -130, elR: 54, sword: -12, shL: 28, elL: 26, hipL: 15, shinL: -4, hipR: -19, shinR: -24 }), ease: easeInCubic },
-  { t: 0.43, pose: P({ pelvisX: 14, pelvisY: 70, torso: 21, head: -2, shR: 66, elR: 6, sword: 14, shL: -20, elL: 32, hipL: 24, shinL: 2, hipR: -26, shinR: -30 }), ease: easeInCubic },
-  { t: 0.60, pose: P({ pelvisX: 10, pelvisY: 71, torso: 15, head: -1, shR: 50, elR: 15, sword: 26, shL: -14, elL: 26, hipL: 18, shinL: 0, hipR: -20, shinR: -24 }), ease: easeOutCubic },
-  { t: 0.88, pose: IDLE, ease: easeInOutCubic },
-];
-
 const HIT: Key[] = [
   { t: 0.0, pose: IDLE, ease: easeOutCubic },
   { t: 0.09, pose: P({ pelvisX: -13, pelvisY: 69, torso: -17, head: -15, shL: -36, elL: 56, shR: -28, elR: 50, sword: -35, hipL: 12, shinL: -6, hipR: -20, shinR: -26 }), ease: easeOutCubic },
   { t: 0.32, pose: P({ pelvisX: -4, pelvisY: 71, torso: -6, head: -5, shL: -18, elL: 30, shR: -4, elR: 32, sword: -22 }), ease: easeInOutCubic },
   { t: 0.60, pose: IDLE, ease: easeInOutCubic },
+];
+
+// ==== THE MOVESET (M&C §10 — frame budgets are contracts) ====
+// impact = strike frames begin; strikeEnd = strike frames end (smear window);
+// cancelFrom = roll/backstep/chain window opens; Infinity = commit.
+
+interface Move {
+  name: string;
+  keys: Key[];
+  impact: number; strikeEnd: number; total: number;
+  cancelFrom: number;
+  chain?: string;   // next light in the combo
+  lunge: number;    // forward px carried through the strike (momentum honesty)
+  dust: number;     // painted flecks at impact
+  loud: number;     // ATTENTION-IS-NOISE value (consumed in Phase 2b)
+}
+
+// L1 — THE DESCENDING CUT. 8f anticip · 3f strike · 12f follow. Cancel: impact+2f.
+const L1: Move = {
+  name: "L1",
+  keys: [
+    { t: 0, pose: IDLE, ease: easeInOutCubic },
+    { t: 8 * F, pose: P({ pelvisX: -9, pelvisY: 68, torso: -16, head: 6, shR: -138, elR: 62, sword: -12, shL: 30, elL: 26, hipL: 15, shinL: -4, hipR: -19, shinR: -24 }), ease: easeInOutCubic },
+    { t: 11 * F, pose: P({ pelvisX: 14, pelvisY: 70, torso: 21, head: -2, shR: 66, elR: 6, sword: 14, shL: -20, elL: 32, hipL: 24, shinL: 2, hipR: -26, shinR: -30 }), ease: easeInCubic },
+    { t: 17 * F, pose: P({ pelvisX: 10, pelvisY: 71, torso: 15, head: -1, shR: 50, elR: 15, sword: 26, shL: -14, elL: 26, hipL: 18, shinL: 0, hipR: -20, shinR: -24 }), ease: easeOutCubic },
+    { t: 23 * F, pose: IDLE, ease: easeInOutCubic },
+  ],
+  impact: 8 * F, strikeEnd: 11 * F, total: 23 * F, cancelFrom: 13 * F,
+  chain: "L2", lunge: 10, dust: 6, loud: 3,
+};
+
+// L2 — THE CROSS. 6f anticip · 3f strike · 12f follow. Coil across the body,
+// untwist through a level sweep. Chain L3 or roll.
+const L2: Move = {
+  name: "L2",
+  keys: [
+    { t: 0, pose: P({ pelvisX: -6, pelvisY: 69, torso: -12, head: 4, shR: -50, elR: 80, sword: -120, shL: 26, elL: 20, hipL: 14, shinL: -2, hipR: -18, shinR: -26 }), ease: easeInOutCubic },
+    { t: 6 * F, pose: P({ pelvisX: -8, pelvisY: 69, torso: -15, head: 5, shR: -58, elR: 84, sword: -124, shL: 28, elL: 22, hipL: 14, shinL: -2, hipR: -18, shinR: -26 }), ease: easeInCubic },
+    { t: 9 * F, pose: P({ pelvisX: 12, pelvisY: 70, torso: 18, head: -3, shR: 55, elR: 8, sword: 55, shL: -18, elL: 30, hipL: 22, shinL: 0, hipR: -24, shinR: -28 }), ease: easeInCubic },
+    { t: 15 * F, pose: P({ pelvisX: 8, pelvisY: 70, torso: 12, head: -2, shR: 70, elR: 12, sword: 72, shL: -12, elL: 26, hipL: 18, shinL: 0, hipR: -20, shinR: -26 }), ease: easeOutCubic },
+    { t: 21 * F, pose: IDLE, ease: easeInOutCubic },
+  ],
+  impact: 6 * F, strikeEnd: 9 * F, total: 21 * F, cancelFrom: 11 * F,
+  chain: "L3", lunge: 12, dust: 6, loud: 3,
+};
+
+// L3 — THE RISING CUT (capstone). 12f anticip · 4f strike · 18f follow. Commit —
+// no cancel. Deep crouch load, explosive rise, HELD pose at the top (cover frame).
+const L3: Move = {
+  name: "L3",
+  keys: [
+    { t: 0, pose: P({ pelvisX: -4, pelvisY: 62, torso: 18, head: 2, shR: -10, elR: 12, sword: -50, shL: 24, elL: 30, hipL: 30, shinL: -16, hipR: -22, shinR: -52 }), ease: easeInOutCubic },
+    { t: 12 * F, pose: P({ pelvisX: -10, pelvisY: 52, torso: 30, head: 6, shR: -24, elR: 14, sword: -40, shL: 34, elL: 40, hipL: 40, shinL: -20, hipR: -20, shinR: -70 }), ease: easeInCubic },
+    { t: 16 * F, pose: P({ pelvisX: 12, pelvisY: 82, torso: -18, head: -8, shR: 85, elR: 6, sword: 62, shL: -26, elL: 24, hipL: 10, shinL: 6, hipR: -22, shinR: -18 }), ease: easeInCubic },
+    { t: 25 * F, pose: P({ pelvisX: 10, pelvisY: 78, torso: -14, head: -6, shR: 82, elR: 8, sword: 58, shL: -22, elL: 24, hipL: 10, shinL: 4, hipR: -20, shinR: -18 }), ease: easeOutCubic },
+    { t: 34 * F, pose: IDLE, ease: easeInOutCubic },
+  ],
+  impact: 12 * F, strikeEnd: 16 * F, total: 34 * F, cancelFrom: Infinity,
+  lunge: 14, dust: 9, loud: 3.4,
+};
+
+// HEAVY — release of the charge. 4f strike · 20f follow. Overhead smash to the
+// ground ahead; a whiffed heavy pulls the knight a half-step (§9 momentum).
+const HEAVY: Move = {
+  name: "HEAVY",
+  keys: [
+    { t: 0, pose: P({ pelvisX: -12, pelvisY: 66, torso: -22, head: -8, shR: -155, elR: 40, sword: -20, shL: 36, elL: 30, hipL: 18, shinL: -6, hipR: -24, shinR: -34 }), ease: easeInCubic },
+    { t: 4 * F, pose: P({ pelvisX: 18, pelvisY: 64, torso: 30, head: -4, shR: 92, elR: 4, sword: -40, shL: -24, elL: 30, hipL: 30, shinL: 6, hipR: -30, shinR: -40 }), ease: easeInCubic },
+    { t: 9 * F, pose: P({ pelvisX: 16, pelvisY: 63, torso: 33, head: -2, shR: 90, elR: 6, sword: -38, shL: -22, elL: 30, hipL: 30, shinL: 6, hipR: -30, shinR: -40 }), ease: easeOutCubic },
+    { t: 24 * F, pose: IDLE, ease: easeInOutCubic },
+  ],
+  impact: 0, strikeEnd: 4 * F, total: 24 * F, cancelFrom: Infinity,
+  lunge: 18, dust: 12, loud: 4,
+};
+
+// RUNNING ATTACK — 6f sprint-cancel · 4f strike · 16f follow. A cross-slash
+// that rides the sprint's momentum out through a long skid stance.
+const RUNATK: Move = {
+  name: "RUNATK",
+  keys: [
+    { t: 0, pose: P({ pelvisX: -4, pelvisY: 66, torso: 24, head: 2, shR: -40, elR: 30, sword: -110, shL: 30, elL: 24, hipL: 34, shinL: 8, hipR: -30, shinR: -58 }), ease: easeInOutCubic },
+    { t: 6 * F, pose: P({ pelvisX: -6, pelvisY: 65, torso: 27, head: 4, shR: -48, elR: 34, sword: -116, shL: 32, elL: 26, hipL: 36, shinL: 10, hipR: -32, shinR: -62 }), ease: easeInCubic },
+    { t: 10 * F, pose: P({ pelvisX: 12, pelvisY: 66, torso: 16, head: -3, shR: 62, elR: 6, sword: 48, shL: -18, elL: 28, hipL: 40, shinL: 10, hipR: -36, shinR: -70 }), ease: easeInCubic },
+    { t: 17 * F, pose: P({ pelvisX: 8, pelvisY: 69, torso: 10, head: -2, shR: 68, elR: 10, sword: 60, shL: -12, elL: 24, hipL: 28, shinL: 4, hipR: -28, shinR: -46 }), ease: easeOutCubic },
+    { t: 26 * F, pose: IDLE, ease: easeInOutCubic },
+  ],
+  impact: 6 * F, strikeEnd: 10 * F, total: 26 * F, cancelFrom: 18 * F,
+  lunge: 26, dust: 8, loud: 3.6,
+};
+
+// ROLLING ATTACK — 4f out of the roll's plant · 3f strike · 14f follow.
+// A short rising rip straight out of the crouch.
+const ROLLATK: Move = {
+  name: "ROLLATK",
+  keys: [
+    { t: 0, pose: P({ pelvisX: -2, pelvisY: 46, torso: 28, head: 8, shR: -30, elR: 20, sword: -140, shL: 30, elL: 44, hipL: 52, shinL: -28, hipR: -38, shinR: -66 }), ease: easeInCubic },
+    { t: 4 * F, pose: P({ pelvisX: -4, pelvisY: 44, torso: 30, head: 10, shR: -36, elR: 22, sword: -144, shL: 32, elL: 46, hipL: 54, shinL: -30, hipR: -40, shinR: -68 }), ease: easeInCubic },
+    { t: 7 * F, pose: P({ pelvisX: 10, pelvisY: 74, torso: -8, head: -6, shR: 70, elR: 10, sword: 55, shL: -20, elL: 26, hipL: 14, shinL: 2, hipR: -20, shinR: -22 }), ease: easeInCubic },
+    { t: 21 * F, pose: IDLE, ease: easeInOutCubic },
+  ],
+  impact: 4 * F, strikeEnd: 7 * F, total: 21 * F, cancelFrom: Infinity,
+  lunge: 12, dust: 7, loud: 3.2,
+};
+
+// BACKSTEP POKE — 5f · 2f · 10f. A straight thrust out of the backstep;
+// the spacing answer. Cancel: backstep again.
+const POKE: Move = {
+  name: "POKE",
+  keys: [
+    { t: 0, pose: P({ pelvisX: -6, pelvisY: 70, torso: -6, head: 2, shR: -18, elR: 60, sword: 48, shL: 24, elL: 40, hipL: 12, shinL: -4, hipR: -20, shinR: -30 }), ease: easeInOutCubic },
+    { t: 5 * F, pose: P({ pelvisX: -8, pelvisY: 70, torso: -8, head: 3, shR: -22, elR: 64, sword: 44, shL: 26, elL: 42, hipL: 12, shinL: -4, hipR: -20, shinR: -30 }), ease: easeInCubic },
+    { t: 7 * F, pose: P({ pelvisX: 8, pelvisY: 71, torso: 14, head: -2, shR: 62, elR: 22, sword: 6, shL: -14, elL: 28, hipL: 20, shinL: 0, hipR: -24, shinR: -30 }), ease: easeInCubic },
+    { t: 17 * F, pose: IDLE, ease: easeInOutCubic },
+  ],
+  impact: 5 * F, strikeEnd: 7 * F, total: 17 * F, cancelFrom: 9 * F,
+  lunge: 8, dust: 4, loud: 2.8,
+};
+
+const MOVES: Record<string, Move> = { L1, L2, L3, HEAVY, RUNATK, ROLLATK, POKE };
+
+// ---- non-attack timelines ----
+
+// ROLL — 26f, FIXED distance (ER honesty), i-frames 4f–18f, heavy plant exit.
+// bodyRot carries a true forward somersault; limbs tuck; cloak wraps.
+const ROLL_T = 26 * F, ROLL_DIST = 140;
+const ROLL_IV0 = 4 * F, ROLL_IV1 = 18 * F;
+const ROLL: Key[] = [
+  { t: 0, pose: P({ pelvisY: 46, bodyRot: 30, torso: 30, head: 30, shL: 40, elL: 80, shR: 44, elR: 76, sword: -150, hipL: 60, shinL: -70, hipR: 44, shinR: -50 }), ease: easeInCubic },
+  { t: 6 * F, pose: P({ pelvisY: 32, bodyRot: 150, torso: 34, head: 40, shL: 55, elL: 105, shR: 60, elR: 100, sword: -170, hipL: 95, shinL: -130, hipR: 80, shinR: -110 }), ease: easeInOutCubic },
+  { t: 13 * F, pose: P({ pelvisY: 30, bodyRot: 260, torso: 34, head: 40, shL: 55, elL: 105, shR: 60, elR: 100, sword: -170, hipL: 95, shinL: -130, hipR: 80, shinR: -110 }), ease: easeInOutCubic },
+  { t: 19 * F, pose: P({ pelvisY: 36, bodyRot: 342, torso: 30, head: 26, shL: 46, elL: 90, shR: 50, elR: 84, sword: -160, hipL: 80, shinL: -100, hipR: 60, shinR: -84 }), ease: easeInOutCubic },
+  { t: 22 * F, pose: P({ pelvisY: 52, bodyRot: 360, torso: 22, head: 8, shL: 26, elL: 40, shR: 20, elR: 34, sword: -120, hipL: 55, shinL: -30, hipR: -40, shinR: -70 }), ease: easeOutCubic },
+  { t: 26 * F, pose: P({ bodyRot: 360, pelvisY: 70, torso: 12 }), ease: easeInOutCubic },
+];
+
+// BACKSTEP — 16f grounded hop back, ~66px. The spacing verb.
+const BSTEP_T = 16 * F, BSTEP_DIST = 66;
+const BSTEP: Key[] = [
+  { t: 0, pose: P({ pelvisY: 72, torso: -4, head: 0, hipL: -10, shinL: -30, hipR: 25, shinR: 5, shL: 4, elL: 30, shR: 20, elR: 40, sword: -30 }), ease: easeOutCubic },
+  { t: 6 * F, pose: P({ pelvisY: 78, torso: -10, head: -2, hipL: 16, shinL: -20, hipR: 30, shinR: -6, shL: 10, elL: 36, shR: 24, elR: 44, sword: -34 }), ease: easeInOutCubic },
+  { t: 12 * F, pose: P({ pelvisY: 68, torso: -4, head: -1, hipL: 18, shinL: -6, hipR: -30, shinR: -50, shL: 0, elL: 24, shR: 18, elR: 30, sword: -22 }), ease: easeOutCubic },
+  { t: 16 * F, pose: IDLE, ease: easeInOutCubic },
+];
+
+// HUSH-PARRY (§11) — 1f startup, 8f window, whiff recovery to 33f (exposed).
+// The catch is a SMOTHER: cloak forearm wraps the strike; no spark, ever.
+const PARRY_W0 = 1 * F, PARRY_W1 = 9 * F, PARRY_T = 33 * F;
+const PARRY: Key[] = [
+  { t: 0, pose: P({ pelvisX: -4, pelvisY: 70, torso: -6, head: 0, shL: 40, elL: 60, shR: 30, elR: 70, sword: -110, hipL: 18, shinL: -8, hipR: -24, shinR: -38 }), ease: easeOutCubic },
+  { t: 2 * F, pose: P({ pelvisX: -5, pelvisY: 70, torso: -4, head: -4, shL: 66, elL: 104, shR: 46, elR: 88, sword: -170, hipL: 18, shinL: -8, hipR: -24, shinR: -38 }), ease: easeOutCubic },
+  { t: 18 * F, pose: P({ pelvisX: -5, pelvisY: 70, torso: -4, head: -4, shL: 64, elL: 100, shR: 44, elR: 86, sword: -168, hipL: 18, shinL: -8, hipR: -24, shinR: -38 }), ease: easeInOutCubic },
+  { t: 33 * F, pose: IDLE, ease: easeInOutCubic },
+];
+const PARRY_CATCH = PARRY[1].pose;
+
+// GUARD — 4f raise · 6f lower. Blade vertical, cloak forearm leading, braced.
+const GUARD_POSE = P({
+  pelvisX: -4, pelvisY: 70, torso: -8, head: 2,
+  shL: 58, elL: 96, shR: 40, elR: 95, sword: -125,
+  hipL: 20, shinL: -8, hipR: -26, shinR: -40,
+});
+
+// CHARGE — blade cocked high behind the shoulder; trembles as it fills.
+// The head stays UP: a knight charging a blow watches what he means to end.
+const CHARGE_POSE = P({
+  pelvisX: -12, pelvisY: 66, torso: -22, head: -8,
+  shR: -155, elR: 40, sword: -20, shL: 36, elL: 30,
+  hipL: 18, shinL: -6, hipR: -24, shinR: -34,
+});
+
+// SKID — the sprint's 6f settle: plant, dust, cloak overtakes and falls back.
+const SKID_POSE = P({
+  pelvisX: -6, pelvisY: 66, torso: 16, head: -4,
+  shL: 18, elL: 30, shR: 24, elR: 36, sword: -26,
+  hipL: 46, shinL: 18, hipR: -36, shinR: -64,
+});
+
+// COLLAPSE — knees buckle, forward fall, sprawled. Wounds did this.
+const DOWNED = P({
+  pelvisX: 0, pelvisY: 12, bodyRot: 78, torso: 26, head: 24,
+  shL: -20, elL: 30, shR: 62, elR: 30, sword: -60,
+  hipL: 14, shinL: -8, hipR: -20, shinR: -34,
+});
+const COLLAPSE: Key[] = [
+  { t: 0, pose: P({ pelvisX: -14, pelvisY: 62, torso: -20, head: -18, shL: -30, elL: 46, shR: -20, elR: 40, sword: -40, hipL: 14, shinL: -6, hipR: -22, shinR: -30 }), ease: easeOutCubic },
+  { t: 0.25, pose: P({ pelvisY: 38, torso: 18, head: 8, shL: 10, elL: 34, shR: 24, elR: 30, sword: -55, hipL: 70, shinL: -110, hipR: 60, shinR: -100 }), ease: easeInCubic },
+  { t: 0.55, pose: P({ pelvisY: 20, bodyRot: 55, torso: 26, head: 18, shL: 40, elL: 30, shR: 50, elR: 20, sword: -60, hipL: 30, shinL: -40, hipR: 10, shinR: -50 }), ease: easeInCubic },
+  { t: 0.9, pose: DOWNED, ease: easeOutCubic },
+];
+
+// RISE — the revive/rally: push up, kneel, stand. Shorter than the wake —
+// there is no ceremony the second time, only effort.
+const RISE: Key[] = [
+  { t: 0, pose: DOWNED, ease: easeInOutCubic },
+  { t: 0.45, pose: P({ pelvisY: 30, bodyRot: 40, torso: 24, head: 4, shL: 30, elL: 40, shR: 44, elR: 24, sword: -50, hipL: 40, shinL: -30, hipR: 10, shinR: -60 }), ease: easeInOutCubic },
+  { t: 0.85, pose: P({ pelvisY: 43, bodyRot: 5, torso: 20, head: -4, shL: 8, elL: 30, shR: 20, elR: 24, sword: -30, hipL: 62, shinL: -8, hipR: -30, shinR: -92 }), ease: easeInOutCubic },
+  { t: 1.3, pose: IDLE, ease: easeOutCubic },
+];
+
+// EMBRACE — the reviver kneels and wraps arms around the fallen. Held.
+const EMBRACE_POSE = P({
+  pelvisY: 40, torso: 24, head: 14,
+  shL: 46, elL: 60, shR: 58, elR: 70, sword: -95,
+  hipL: 78, shinL: -60, hipR: -52, shinR: 40,
+});
+
+// QUIETING (§13) — plant the blade through the ink and HOLD, kneeling, until
+// it settles. Two seconds, uninterruptible, tender. A vow, not a move.
+const QUIET_T = 2.8;
+const QUIETING: Key[] = [
+  { t: 0, pose: IDLE, ease: easeInOutCubic },
+  { t: 0.35, pose: P({ pelvisY: 76, torso: 6, head: -6, shR: 58, elR: 34, sword: -87, shL: 44, elL: 52, hipL: 10, shinL: -2, hipR: -14, shinR: -18 }), ease: easeInOutCubic },
+  { t: 0.6, pose: P({ pelvisY: 48, torso: 20, head: 10, shR: 34, elR: 26, sword: -55, shL: 30, elL: 40, hipL: 50, shinL: -20, hipR: -26, shinR: -80 }), ease: easeInCubic },
+  { t: 0.8, pose: P({ pelvisY: 40, torso: 14, head: 24, shR: 28, elR: 28, sword: -52, shL: 26, elL: 36, hipL: 62, shinL: -8, hipR: -30, shinR: -92 }), ease: easeOutCubic },
+  { t: 2.45, pose: P({ pelvisY: 40, torso: 15, head: 25, shR: 28, elR: 28, sword: -52, shL: 26, elL: 36, hipL: 62, shinL: -8, hipR: -30, shinR: -92 }), ease: easeInOutCubic },
+  { t: 2.8, pose: IDLE, ease: easeInOutCubic },
 ];
 
 function sampleTimeline(keys: Key[], t: number): Pose {
@@ -117,7 +327,26 @@ const SPECKLE: [number, number][] = [
 const CLOAK_N = 7, CLOAK_LINK = 12.5;
 interface CNode { x: number; y: number; px: number; py: number }
 
-export type KnightState = "prelude" | "wake" | "idle" | "walk" | "attack" | "hit" | "sit";
+export type KnightState =
+  | "prelude" | "wake" | "idle" | "walk" | "sprint" | "skid"
+  | "roll" | "backstep" | "act" | "charge" | "guard" | "parry"
+  | "quieting" | "collapse" | "crawl" | "rise" | "embrace"
+  | "hit" | "sit";
+
+// what a player (or the QA harness) asks of the knight this frame
+export interface Intents {
+  axis: number; sprint: boolean;
+  attackTap: boolean;
+  heavyTap: boolean; heavyHeld: boolean;
+  roll: boolean;
+  guardHeld: boolean;
+  parryTap: boolean;
+}
+export const NO_INTENT: Intents = {
+  axis: 0, sprint: false, attackTap: false,
+  heavyTap: false, heavyHeld: false, roll: false,
+  guardHeld: false, parryTap: false,
+};
 
 // seated at the fire — legs folded, sword across the lap, head toward the flame
 const SIT = P({
@@ -125,6 +354,8 @@ const SIT = P({
   shL: 14, elL: 44, shR: 26, elR: 50, sword: -84,
   hipL: 82, shinL: -64, hipR: -58, shinR: 48,
 });
+
+const WALK_SPEED = 150, SPRINT_SPEED = 268, CRAWL_SPEED = 26, GUARD_SHUFFLE = 40;
 
 export class Knight {
   x: number; facing = 1;
@@ -135,9 +366,27 @@ export class Knight {
   vx = 0; // knockback impulse velocity
   boundsL = 320; boundsR = 2100; // set per scene by the journey
   lightX = 1150;                 // key-light x — shadows point away (set per scene)
+  wounds = 0;                    // 3 = collapse; read as breath + stance, never a bar
+  reviveT = 0;                   // filled by a partner's embrace
+  parryRipT = 0;                 // riposte window after a successful hush-parry
+  lastParryT = -1e9;             // world-time of last catch (dual-parry detection)
+  noise = 0; noiseT = -1e9;      // ATTENTION-IS-NOISE hooks (Phase 2b reads these)
   private lastStepSign = 0;
   private cloak: CNode[] = [];
-  private smearFrom = 0;
+  private actFired = false;
+  private act: Move | null = null;
+  private chainBuf = 0;          // buffered attack tap (s remaining)
+  private rollBuf = 0;           // buffered roll tap
+  private rollAxisBuf = 0;       // direction held AT the tap (intent fidelity)
+  private heavyCharge = 0;       // 0..1 at release
+  private parryHold = 0;         // the held breath after a catch
+  private guardJolt = 0;         // chip-jolt timer while guarding
+  private sprintT = 0;
+  private crawlPhase = 0;
+  private soloDownT = 0;         // provisional: solo knights rally after a while
+  private moveX0 = 0;            // scripted displacement origin (roll/backstep)
+  private moveDir = 1;
+  private tNow = 0;
   hitFlash = 0;
   wakeDone = false;
 
@@ -154,9 +403,69 @@ export class Knight {
   resetToLying(x: number) {
     this.x = x; this.facing = 1; this.state = "prelude"; this.stateT = 0;
     this.cur = { ...LYING }; this.vx = 0; this.wakeDone = false;
+    this.wounds = 0; this.reviveT = 0; this.act = null;
   }
-  tryAttack() {
-    if (this.state === "idle" || this.state === "walk") { this.state = "attack"; this.stateT = 0; }
+
+  // ---- state queries ----
+  get sitting() { return this.state === "sit"; }
+  get sitSettled() { return this.state === "sit" && this.stateT > 1.1; }
+  get downed() { return this.state === "crawl"; }
+  get sprinting() { return this.state === "sprint"; }
+  get invulnerable() { return this.state === "roll" && this.stateT >= ROLL_IV0 && this.stateT <= ROLL_IV1; }
+  private get parryOpen() { return this.state === "parry" && this.parryHold <= 0 && this.stateT >= PARRY_W0 && this.stateT <= PARRY_W1; }
+  private mobile() {
+    return this.state === "idle" || this.state === "walk" || this.state === "sprint" || this.state === "skid";
+  }
+  private busy() {
+    return !(this.mobile() || this.state === "guard" || this.state === "sit");
+  }
+
+  // ---- verb entries ----
+  tryAttack() { this.chainBuf = 0.18; } // legacy API — consumed like a buffered tap
+  private startAct(m: Move, charge = 0) {
+    this.state = "act"; this.stateT = 0; this.act = m;
+    this.actFired = false; this.chainBuf = 0; this.heavyCharge = charge;
+    this.noise = m.loud; this.noiseT = this.tNow;
+  }
+  private startRollOrBackstep(axisNow: number, fx: Fx) {
+    this.rollBuf = 0;
+    // the direction held at the TAP wins; the stick's current whisper is the fallback
+    const axis = Math.abs(this.rollAxisBuf) > 0.2 ? this.rollAxisBuf : axisNow;
+    this.rollAxisBuf = 0;
+    if (Math.abs(axis) > 0.2) {
+      this.facing = axis > 0 ? 1 : -1;
+      this.state = "roll"; this.stateT = 0;
+      this.moveX0 = this.x; this.moveDir = this.facing;
+      this.noise = 2.5; this.noiseT = this.tNow;
+      // the cloak wraps into the tumble
+      for (const n of this.cloak) { n.px = n.x = lerp(n.x, this.x, 0.55); n.py = n.y = lerp(n.y, GROUND_Y - 40, 0.4); }
+      fx.dust(this.x, GROUND_Y - 2, 4, -this.facing * 0.5);
+    } else {
+      this.state = "backstep"; this.stateT = 0;
+      this.moveX0 = this.x; this.moveDir = -this.facing;
+      this.noise = 2; this.noiseT = this.tNow;
+      fx.dust(this.x + this.facing * 6, GROUND_Y - 2, 3, this.facing * 0.6);
+    }
+  }
+  startQuieting() {
+    if (this.busy() && this.state !== "guard") return;
+    this.state = "quieting"; this.stateT = 0;
+  }
+  startRise(soloRally = false) {
+    if (this.state !== "crawl" && this.state !== "collapse") return;
+    this.state = "rise"; this.stateT = 0; this.reviveT = 0;
+    this.wounds = soloRally ? 2 : 1; // rallied alone = still ragged
+  }
+  // the same held gesture as the fire-rest, aimed at a fallen partner
+  private embraceTX = 0;
+  setEmbrace(active: boolean, faceX: number) {
+    if (active && this.mobile()) {
+      this.state = "embrace"; this.stateT = 0;
+      this.facing = faceX >= this.x ? 1 : -1;
+      this.embraceTX = faceX - this.facing * 46; // kneel at the shoulder, not on top
+    } else if (!active && this.state === "embrace") {
+      this.state = "idle"; this.stateT = 0;
+    }
   }
   // the rest ritual: caller decides eligibility (near a fire); any movement stands back up
   setRest(held: boolean, faceX: number) {
@@ -167,40 +476,117 @@ export class Knight {
       this.state = "idle"; this.stateT = 0;
     }
   }
-  get sitting() { return this.state === "sit"; }
-  get sitSettled() { return this.state === "sit" && this.stateT > 1.1; }
-  tryHit(fx: Fx) {
-    if (this.state === "wake" || this.state === "prelude") return;
-    this.state = "hit"; this.stateT = 0;
-    this.vx = -this.facing * 240;
+
+  tryHit(fx: Fx, heavy = false) {
+    if (this.state === "wake" || this.state === "prelude" || this.state === "rise") return;
+    if (this.state === "collapse" || this.state === "crawl") return;
+    if (this.state === "quieting") return; // a vow is kept (§13) — provisional until 2b
+    if (this.invulnerable) return;         // honest i-frames (ER law)
+    // the hush-parry catch — the strike is smothered, the world holds its breath
+    if (this.parryOpen) {
+      this.parryHold = 0.3;
+      this.lastParryT = this.tNow;
+      this.noise = 0.2; this.noiseT = this.tNow; // a parry is the QUIET answer
+      fx.stall(0.3);
+      return;
+    }
+    // guard chips but holds against light blows; heavies break through
+    if (this.state === "guard" && !heavy) {
+      this.vx = -this.facing * 90;
+      this.guardJolt = 0.12;
+      this.hitFlash = 0.06;
+      fx.dust(this.x + this.facing * 24, GROUND_Y - 34, 3, this.facing * 0.4);
+      return;
+    }
+    this.wounds++;
     this.hitFlash = 0.14;
+    this.vx = -this.facing * 240;
     for (const n of this.cloak) { n.px -= this.facing * 7; } // whip
     fx.dust(this.x, GROUND_Y - 2, 6, -this.facing);
+    if (this.wounds >= 3) {
+      this.state = "collapse"; this.stateT = 0; this.soloDownT = 0;
+    } else {
+      this.state = "hit"; this.stateT = 0;
+    }
   }
 
-  private busy() { return this.state === "attack" || this.state === "hit" || this.state === "wake" || this.state === "prelude"; }
-
-  update(dt: number, axis: number, t: number, fx: Fx) {
+  update(dt: number, ii: Intents, t: number, fx: Fx) {
+    this.tNow = t;
     this.stateT += dt;
     this.hitFlash = Math.max(0, this.hitFlash - dt);
+    this.parryRipT = Math.max(0, this.parryRipT - dt);
+    this.guardJolt = Math.max(0, this.guardJolt - dt);
+    this.chainBuf = Math.max(0, this.chainBuf - dt);
+    this.rollBuf = Math.max(0, this.rollBuf - dt);
+    if (ii.attackTap) this.chainBuf = 0.18;
+    if (ii.roll) { this.rollBuf = 0.15; this.rollAxisBuf = ii.axis; }
 
-    // locomotion (moving stands a sitting knight back up)
-    if (!this.busy()) {
-      if (Math.abs(axis) > 0.2) {
-        this.state = "walk";
-        this.facing = axis > 0 ? 1 : -1;
-        const speed = 150 * Math.abs(axis);
-        this.x += speed * this.facing * dt;
-        this.walkPhase += (speed / 26) * dt; // stride frequency
+    // ---- verb starts from mobile/guard states ----
+    if (this.mobile() || this.state === "guard") {
+      if (this.rollBuf > 0) {
+        this.startRollOrBackstep(ii.axis, fx);
+      } else if (ii.heavyTap && this.state !== "guard") {
+        this.state = "charge"; this.stateT = 0;
+        // facing locks toward the stick if it speaks, else stays
+        if (Math.abs(ii.axis) > 0.2) this.facing = ii.axis > 0 ? 1 : -1;
+      } else if (this.chainBuf > 0) {
+        if (Math.abs(ii.axis) > 0.2) this.facing = ii.axis > 0 ? 1 : -1;
+        this.startAct(this.state === "sprint" ? RUNATK : L1);
+        if (this.act === RUNATK) this.vx = SPRINT_SPEED * this.facing * 0.5;
+      } else if (ii.parryTap && this.state !== "guard") {
+        this.state = "parry"; this.stateT = 0; this.parryHold = 0;
+      } else if (ii.guardHeld && this.state !== "guard") {
+        this.state = "guard"; this.stateT = 0;
+      }
+    }
+
+    // ---- locomotion (walk / sprint / guard shuffle; moving stands a sitter up) ----
+    if (this.mobile()) {
+      if (Math.abs(ii.axis) > 0.2) {
+        const wantSprint = ii.sprint;
+        if (wantSprint && this.state !== "sprint") { this.state = "sprint"; this.stateT = 0; this.sprintT = 0; this.noise = 2; this.noiseT = t; }
+        if (!wantSprint && this.state === "sprint") { this.state = "skid"; this.stateT = 0; fx.dust(this.x, GROUND_Y - 2, 6, this.facing); }
+        if (this.state !== "skid") {
+          if (this.state !== "sprint") this.state = "walk";
+          this.facing = ii.axis > 0 ? 1 : -1;
+          let speed = WALK_SPEED * Math.abs(ii.axis);
+          if (this.state === "sprint") {
+            this.sprintT += dt;
+            // §4 ramp: 12 frames of true acceleration — the first strides DIG
+            speed = lerp(WALK_SPEED, SPRINT_SPEED, clamp(this.sprintT / (12 * F), 0, 1)) * Math.abs(ii.axis);
+          }
+          this.x += speed * this.facing * dt;
+          this.walkPhase += (speed / (this.state === "sprint" ? 31 : 26)) * dt;
+        }
       } else if (this.state === "walk") {
         this.state = "idle"; this.stateT = 0;
+      } else if (this.state === "sprint") {
+        // §4: stopping takes 6 frames of settle — plant, skid-dust, cloak overtakes
+        this.state = "skid"; this.stateT = 0;
+        fx.dust(this.x + this.facing * 10, GROUND_Y - 2, 7, this.facing);
       }
+      if (this.state === "skid" && this.stateT >= 6 * F) { this.state = "idle"; this.stateT = 0; }
+    } else if (this.state === "guard" && Math.abs(ii.axis) > 0.2) {
+      this.x += GUARD_SHUFFLE * ii.axis * dt; // guarded shuffle — facing stays locked
+    } else if (this.state === "crawl" && Math.abs(ii.axis) > 0.2) {
+      this.x += CRAWL_SPEED * ii.axis * dt;
+      this.crawlPhase += dt * 2.2;
     }
     this.x += this.vx * dt;
     this.vx = damp(this.vx, 0, 9, dt);
+
+    // scripted displacement — roll/backstep distances are FIXED (spacing honesty)
+    if (this.state === "roll") {
+      this.x = this.moveX0 + ROLL_DIST * easeInOutCubic(clamp(this.stateT / ROLL_T, 0, 1)) * this.moveDir;
+    } else if (this.state === "backstep") {
+      this.x = this.moveX0 + BSTEP_DIST * easeOutCubic(clamp(this.stateT / BSTEP_T, 0, 1)) * this.moveDir;
+    }
     this.x = clamp(this.x, this.boundsL, this.boundsR);
 
-    // pose target
+    // fatigue reads as slower recoveries — never a bar (§8)
+    const fatigue = this.wounds >= 2 ? 0.86 : 1;
+
+    // ---- pose target ----
     let target: Pose;
     let rate = 12;
     switch (this.state) {
@@ -211,20 +597,139 @@ export class Knight {
         if (this.stateT >= WAKE[WAKE.length - 1].t) { this.state = "idle"; this.stateT = 0; this.wakeDone = true; }
         break;
       }
-      case "attack": {
-        target = sampleTimeline(ATTACK, this.stateT);
-        rate = 26;
-        if (this.stateT >= 0.40 && this.smearFrom < 0.30) {
-          // impact dust where the blade meets ground-ish arc
-          fx.dust(this.x + this.facing * 66, GROUND_Y - 8, 8, this.facing);
-          this.smearFrom = 1;
+      case "act": {
+        const m = this.act!;
+        target = sampleTimeline(m.keys, this.stateT);
+        rate = 26 * fatigue;
+        // momentum through the strike (whiffed heavies pull a half-step — §9)
+        if (this.stateT >= m.impact && this.stateT <= m.strikeEnd + 0.05) {
+          const lungeV = (m.lunge * (1 + this.heavyCharge * 0.6)) / (m.strikeEnd + 0.05 - m.impact);
+          this.x = clamp(this.x + lungeV * this.facing * dt, this.boundsL, this.boundsR);
         }
-        if (this.stateT >= ATTACK[ATTACK.length - 1].t) { this.state = "idle"; this.stateT = 0; this.smearFrom = 0; }
+        if (!this.actFired && this.stateT >= m.impact) {
+          this.actFired = true;
+          const n = m.dust + Math.round(this.heavyCharge * 8);
+          fx.dust(this.x + this.facing * 66, GROUND_Y - 8, n, this.facing);
+        }
+        // the cancel window is a contract (§10)
+        if (this.stateT >= m.cancelFrom) {
+          if (this.rollBuf > 0) this.startRollOrBackstep(ii.axis, fx);
+          else if (this.chainBuf > 0 && m.chain) this.startAct(MOVES[m.chain]);
+        }
+        if (this.state === "act" && this.stateT >= m.total) {
+          this.state = "idle"; this.stateT = 0; this.act = null;
+        }
+        break;
+      }
+      case "charge": {
+        target = { ...CHARGE_POSE };
+        // the blade fills: 10f–45f of hold (§10); trembling scales with charge
+        const charge = clamp((this.stateT - 10 * F) / (35 * F), 0, 1);
+        const tremor = noise1(t * 13) * rad(1.6) * (0.3 + charge);
+        target.torso += tremor; target.shR += tremor * 1.4;
+        target.pelvisY -= charge * 2;
+        rate = 14;
+        if (!ii.heavyHeld) this.startAct(HEAVY, charge);
+        break;
+      }
+      case "roll": {
+        target = sampleTimeline(ROLL, this.stateT);
+        rate = 30; // the somersault must track its own rotation
+        if (this.stateT >= ROLL_T) {
+          if (this.chainBuf > 0) this.startAct(ROLLATK);
+          else { this.state = "idle"; this.stateT = 0; }
+        }
+        break;
+      }
+      case "backstep": {
+        target = sampleTimeline(BSTEP, this.stateT);
+        rate = 26;
+        if (this.chainBuf > 0 && this.stateT >= 9 * F) this.startAct(POKE);
+        else if (this.stateT >= BSTEP_T) { this.state = "idle"; this.stateT = 0; }
+        break;
+      }
+      case "guard": {
+        target = { ...GUARD_POSE };
+        if (this.guardJolt > 0) { // the chip: braced, jolted, holding
+          target.torso -= rad(9) * (this.guardJolt / 0.12);
+          target.pelvisX -= 4 * (this.guardJolt / 0.12);
+        }
+        rate = this.stateT < 4 * F ? 26 : 10; // 4f raise, then settled
+        if (!ii.guardHeld) { this.state = "idle"; this.stateT = 0; rate = 10; } // 6f lower via blend
+        break;
+      }
+      case "parry": {
+        if (this.parryHold > 0) {
+          // THE HELD BREATH — the catch holds while the world stops (§11)
+          this.parryHold -= dt;
+          target = { ...PARRY_CATCH };
+          rate = 24;
+          if (this.parryHold <= 0) {
+            this.parryRipT = 0.8; // the riposte window opens as breath returns
+            this.state = ii.guardHeld ? "guard" : "idle"; this.stateT = 0;
+          }
+        } else {
+          target = sampleTimeline(PARRY, this.stateT);
+          rate = 26;
+          if (this.stateT >= PARRY_T) { this.state = ii.guardHeld ? "guard" : "idle"; this.stateT = 0; }
+          else if (this.stateT > PARRY_W1 && ii.guardHeld) { this.state = "guard"; this.stateT = 0; } // melt to guard
+        }
+        break;
+      }
+      case "quieting": {
+        target = sampleTimeline(QUIETING, this.stateT);
+        // kneeling breath while the ink settles beneath the blade
+        if (this.stateT > 0.8 && this.stateT < 2.45) {
+          target = { ...target };
+          target.torso += rad(Math.sin(t * 1.6) * 1.1);
+          target.head += rad(Math.sin(t * 1.6 + 0.5) * 0.8);
+        }
+        rate = 16;
+        if (this.stateT === 0.6 || (this.stateT >= 0.6 && this.stateT - dt < 0.6)) {
+          fx.dust(this.x + this.facing * 30, GROUND_Y - 2, 5, this.facing * 0.3);
+        }
+        if (this.stateT >= QUIET_T) { this.state = "idle"; this.stateT = 0; }
+        break;
+      }
+      case "collapse": {
+        target = sampleTimeline(COLLAPSE, this.stateT);
+        rate = 20;
+        if (this.stateT >= COLLAPSE[COLLAPSE.length - 1].t) { this.state = "crawl"; this.stateT = 0; }
+        break;
+      }
+      case "crawl": {
+        // downed: dragging forward on one arm, breath ragged
+        target = { ...DOWNED };
+        const drag = Math.abs(ii.axis) > 0.2 ? 1 : 0;
+        target.shR += rad(Math.sin(this.crawlPhase) * 24 * drag);
+        target.elR += rad(Math.max(0, Math.cos(this.crawlPhase)) * 18 * drag);
+        target.pelvisX += Math.sin(this.crawlPhase) * 2 * drag;
+        target.torso += rad(Math.sin(t * 2.6) * 1.6); // heaving breath
+        target.head += rad(Math.sin(t * 2.6 + 0.4) * 2 - 6);
+        rate = 8;
+        // embrace-revive fills reviveT (main.ts drives it); alone, the knight rallies
+        this.soloDownT += dt;
+        if (this.reviveT >= 1.2) this.startRise(false);
+        else if (this.soloDownT > 6) this.startRise(true); // provisional until 2b death rules
+        break;
+      }
+      case "rise": {
+        target = sampleTimeline(RISE, this.stateT);
+        rate = 18;
+        if (this.stateT >= RISE[RISE.length - 1].t) { this.state = "idle"; this.stateT = 0; }
+        break;
+      }
+      case "embrace": {
+        target = { ...EMBRACE_POSE };
+        target.torso += rad(Math.sin(t * 1.1) * 1.0);
+        target.head += rad(Math.sin(t * 1.1 + 0.6) * 0.8);
+        rate = 11; // kneel with purpose — the fallen shouldn't wait
+        this.x = damp(this.x, this.embraceTX, 6, dt); // two figures, readable as two
         break;
       }
       case "hit": {
         target = sampleTimeline(HIT, this.stateT);
-        rate = 24;
+        rate = 24 * fatigue;
         if (this.stateT >= HIT[HIT.length - 1].t) { this.state = "idle"; this.stateT = 0; }
         break;
       }
@@ -235,6 +740,22 @@ export class Knight {
         target.torso += rad(Math.sin(t * 0.85) * 0.8);
         target.head += rad(noise1(t * 0.22) * 4);
         rate = this.stateT < 1.0 ? 5 : 9;
+        if (this.stateT > 2 && this.wounds > 0) this.wounds = 0; // the fire mends
+        break;
+      }
+      case "skid": {
+        target = SKID_POSE;
+        rate = 24;
+        break;
+      }
+      case "sprint": {
+        target = this.sprintPose();
+        rate = 18;
+        const s = Math.sign(Math.sin(this.walkPhase));
+        if (s !== this.lastStepSign) {
+          this.lastStepSign = s;
+          fx.dust(this.x - this.facing * 10, GROUND_Y - 2, 5, -this.facing * 0.6);
+        }
         break;
       }
       case "walk": {
@@ -266,11 +787,14 @@ export class Knight {
 
   private idlePose(t: number): Pose {
     const p = { ...IDLE };
-    p.pelvisY += Math.sin(t * 1.15) * 1.5;
-    p.torso += rad(Math.sin(t * 1.15) * 0.9);
-    p.head += rad(noise1(t * 0.35) * 6);
-    p.shL += rad(Math.sin(t * 1.15 + 0.6) * 1.5);
-    p.shR += rad(Math.sin(t * 1.15 + 0.9) * 1.2);
+    // wounded knights breathe harder and stand heavier — readability, never a bar
+    const hurt = this.wounds >= 2;
+    const freq = hurt ? 1.65 : 1.15, amp = hurt ? 2.3 : 1.5;
+    p.pelvisY += Math.sin(t * freq) * amp - (hurt ? 3 : 0);
+    p.torso += rad(Math.sin(t * freq) * (hurt ? 1.4 : 0.9) + (hurt ? 4 : 0));
+    p.head += rad(noise1(t * 0.35) * 6 - (hurt ? 6 : 0));
+    p.shL += rad(Math.sin(t * freq + 0.6) * 1.5);
+    p.shR += rad(Math.sin(t * freq + 0.9) * 1.2);
     return p;
   }
 
@@ -288,6 +812,32 @@ export class Knight {
     p.sword = rad(-14);
     // legs via IK from foot targets (local: +x forward, y down from pelvis)
     const stride = 34, lift = 15;
+    const foot = (phase: number): [number, number] => [
+      Math.cos(phase) * stride,
+      p.pelvisY - Math.max(0, Math.sin(phase)) * lift,
+    ];
+    const [flx, fly] = foot(ph);
+    const [frx, fry] = foot(ph + Math.PI);
+    const [hl, sl] = legIK(-3, 0, flx, fly);
+    const [hr, sr] = legIK(3, 0, frx, fry);
+    p.hipL = hl; p.shinL = sl; p.hipR = hr; p.shinR = sr;
+    return p;
+  }
+
+  // §4: powerful, never floaty — deep lean, digging strides, sword trailing
+  private sprintPose(): Pose {
+    const p = { ...IDLE };
+    const ph = this.walkPhase;
+    const ramp = clamp(this.sprintT / (12 * F), 0, 1); // the lean arrives with the speed
+    p.pelvisY = 66 + Math.sin(ph * 2) * 3.4;
+    p.torso = rad(9 + 13 * ramp + Math.sin(ph * 2) * 1.6);
+    p.head = rad(-3);
+    p.shL = rad(30 * Math.sin(ph) - 2);
+    p.elL = rad(22 + Math.max(0, 16 * Math.sin(ph)));
+    p.shR = rad(14 * Math.sin(ph + Math.PI) + 6);
+    p.elR = rad(26);
+    p.sword = rad(-30); // the blade trails — haste is a wakeful thing
+    const stride = 34 + 16 * ramp, lift = 15 + 7 * ramp;
     const foot = (phase: number): [number, number] => [
       Math.cos(phase) * stride,
       p.pelvisY - Math.max(0, Math.sin(phase)) * lift,
@@ -326,7 +876,10 @@ export class Knight {
     }
   }
   private vxEstimate() {
-    return this.state === "walk" ? 150 * this.facing : this.vx;
+    if (this.state === "walk") return WALK_SPEED * this.facing;
+    if (this.state === "sprint") return SPRINT_SPEED * this.facing; // full trail (§4)
+    if (this.state === "roll") return 300 * this.moveDir;
+    return this.vx;
   }
 
   // ---- FK ----
@@ -457,7 +1010,8 @@ export class Knight {
     return [this.x + p.guard[0] * this.facing, GROUND_Y + p.guard[1]];
   }
   attackSmearActive(): boolean {
-    return this.state === "attack" && this.stateT > 0.31 && this.stateT < 0.52;
+    if (this.state !== "act" || !this.act) return false;
+    return this.stateT >= this.act.impact - F && this.stateT <= this.act.strikeEnd + 2 * F;
   }
 
   private limbIdx = 0;
